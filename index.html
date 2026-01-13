@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ConnecTHOR - Connect to Real-Time Geopolitical Market Intelligence</title>
+  <title>ConnecTHOR - Real-Time Geopolitical Market Intelligence</title>
   <meta name="description" content="Real-time visualization of Polymarket geopolitical prediction markets on an interactive 3D globe">
-  <meta property="og:title" content="connecTHOR - Geopolitical Market Intelligence">
+  <meta property="og:title" content="ConnecTHOR - Geopolitical Market Intelligence">
   <meta property="og:description" content="Monitor prediction markets on conflicts, elections, and global events in real-time">
   <meta property="og:image" content="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
@@ -493,7 +493,7 @@
       { lat: 15.4, lng: 44.2, text: '🔴 Red Sea shipping incident', time: '8h ago' },
     ];
 
-    function connecTHOR() {
+    function ConnecTHOR() {
       const globeEl = useRef();
       const [markets, setMarkets] = useState([]);
       const [selected, setSelected] = useState(null);
@@ -588,7 +588,7 @@
         return (
           <div className="loading">
             <div className="loading-icon">🌐</div>
-            <h2>Loading connecTHOR...</h2>
+            <h2>Loading ConnecTHOR...</h2>
             <p>Fetching geopolitical prediction markets</p>
           </div>
         );
@@ -602,7 +602,7 @@
               <div className="logo">
                 <span className="logo-icon">🌐</span>
                 <div className="logo-text">
-                  <h1>connecTHOR</h1>
+                  <h1>ConnecTHOR</h1>
                   <p>Real-Time Geopolitical Market Intelligence</p>
                 </div>
               </div>
@@ -817,7 +817,7 @@
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<connecTHOR />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<ConnecTHOR />);
   </script>
 </body>
 </html>
