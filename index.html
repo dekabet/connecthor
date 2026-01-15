@@ -10,7 +10,7 @@
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <script src="https://unpkg.com/react-globe.gl"></script>
+  <script src="https://unpkg.com/react-globe.gl@2.27.2"></script>
   
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -38,7 +38,16 @@
       overflow: hidden;
     }
     
-    #root { width: 100vw; height: 100vh; }
+    #root { 
+      width: 100vw; 
+      height: 100vh; 
+      background: radial-gradient(ellipse at center, #1a1a3e 0%, #0a0f1a 100%);
+    }
+    
+    /* Globe canvas fallback */
+    canvas {
+      background: transparent !important;
+    }
     
     /* Header */
     .header {
@@ -956,6 +965,57 @@
       const [isOnline, setIsOnline] = useState(true);
       const [lastUpdate, setLastUpdate] = useState(new Date());
 
+      // Globe texture URLs with multiple fallbacks
+      const GLOBE_TEXTURES = {
+        earth: 'https://unpkg.com/three-globe@2.31.1/example/img/earth-blue-marble.jpg',
+        earthAlt: 'https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-blue-marble.jpg',
+        earthAlt2: 'https://cdn.jsdelivr.net/npm/three-globe@2.31.1/example/img/earth-blue-marble.jpg',
+        bump: 'https://unpkg.com/three-globe@2.31.1/example/img/earth-topology.png',
+        sky: 'https://unpkg.com/three-globe@2.31.1/example/img/night-sky.png',
+        skyAlt: 'https://cdn.jsdelivr.net/npm/three-globe@2.31.1/example/img/night-sky.png',
+      };
+
+      const [globeReady, setGlobeReady] = useState(false);
+      const [earthTexture, setEarthTexture] = useState(GLOBE_TEXTURES.earth);
+
+      // Preload textures with fallback chain
+      useEffect(() => {
+        setLoadingStatus('Loading globe textures...');
+        const textureSources = [
+          GLOBE_TEXTURES.earth,
+          GLOBE_TEXTURES.earthAlt,
+          GLOBE_TEXTURES.earthAlt2,
+        ];
+        
+        let currentIndex = 0;
+        
+        const tryLoadTexture = () => {
+          if (currentIndex >= textureSources.length) {
+            // All failed, continue without texture
+            console.log('All texture sources failed, continuing...');
+            setGlobeReady(true);
+            setLoadingStatus('Ready (limited textures)');
+            return;
+          }
+          
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            setEarthTexture(textureSources[currentIndex]);
+            setGlobeReady(true);
+            setLoadingStatus('Textures loaded!');
+          };
+          img.onerror = () => {
+            console.log(`Texture source ${currentIndex + 1} failed, trying next...`);
+            currentIndex++;
+            tryLoadTexture();
+          };
+          img.src = textureSources[currentIndex];
+        };
+        
+        tryLoadTexture();
+      }, []);
+
       // Load country borders
       useEffect(() => {
         setLoadingStatus('Loading map borders...');
@@ -992,8 +1052,10 @@
         
         setTimeout(() => {
           setMarkets(processed);
-          setLoading(false);
-        }, 2000);
+          setLoadingStatus('Ready!');
+          // Small delay to ensure everything is ready
+          setTimeout(() => setLoading(false), 500);
+        }, 1500);
       }, []);
 
       // Globe setup
@@ -1210,9 +1272,11 @@
           {/* Globe */}
           <Globe
             ref={globeEl}
-            globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-            bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
-            backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
+            globeImageUrl={earthTexture}
+            bumpImageUrl={GLOBE_TEXTURES.bump}
+            backgroundImageUrl={GLOBE_TEXTURES.sky}
+            waitForGlobeReady={true}
+            animateIn={true}
             
             // Country borders
             polygonsData={showBorders ? countries.features : []}
