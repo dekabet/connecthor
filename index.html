@@ -11,6 +11,7 @@
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/react-globe.gl@2.27.2"></script>
+    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
   
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -510,7 +511,7 @@
     /* Legend */
     .legend {
       position: absolute;
-      bottom: 320px;
+      bottom: 380px;
       left: 16px;
       z-index: 40;
       background: var(--bg-card);
@@ -629,7 +630,7 @@
     /* Unusual Whales Feed Panel */
     .potus-panel {
       position: absolute;
-      bottom: 100px;
+      bottom: 60px;
       left: 16px;
       width: 320px;
       z-index: 50;
@@ -739,6 +740,15 @@
       font-size: 11px;
     }
     
+    /* Twitter embed customization */
+    .potus-content .twitter-timeline {
+      display: block !important;
+    }
+    
+    .potus-content iframe {
+      border-radius: 0 0 12px 12px !important;
+    }
+    
     @media (max-width: 900px) {
       .markets-panel { display: none; }
       .detail-panel { left: 12px; right: 12px; width: auto; bottom: 80px; transform: none; }
@@ -767,19 +777,27 @@
       RSS2JSON_API: 'https://api.rss2json.com/v1/api.json',
       // OSINT Twitter/X accounts to follow (via Nitter RSS)
       OSINT_FEEDS: [
-        { handle: 'Liveuamap', name: 'Liveuamap', nitter: 'nitter.poast.org' },
-        { handle: 'sentdefender', name: 'Sentinel', nitter: 'nitter.poast.org' },
-        { handle: 'TheStudyofWar', name: 'War Studies', nitter: 'nitter.poast.org' },
-        { handle: 'ELINTNews', name: 'ELINT News', nitter: 'nitter.poast.org' },
-        { handle: 'War_Mapper', name: 'War Mapper', nitter: 'nitter.poast.org' },
-        { handle: 'RALee85', name: 'Rob Lee', nitter: 'nitter.poast.org' },
-        { handle: 'NOELreports', name: 'NOEL Reports', nitter: 'nitter.poast.org' },
+        { handle: 'Liveuamap', name: 'Liveuamap' },
+        { handle: 'sentdefender', name: 'Sentinel' },
+        { handle: 'TheStudyofWar', name: 'War Studies' },
+        { handle: 'ELINTNews', name: 'ELINT News' },
+        { handle: 'War_Mapper', name: 'War Mapper' },
+        { handle: 'RALee85', name: 'Rob Lee' },
+        { handle: 'NOELreports', name: 'NOEL Reports' },
       ],
       // OPTIONAL: Deploy cloudflare-worker.js and set your URL here for more reliable feeds
       // TWITTER_WORKER: 'https://your-worker.your-subdomain.workers.dev/feed',
       TWITTER_WORKER: null, // Set to your worker URL to enable
-      // unusual_whales feed (market news & political moves)
-      WHALES_FEED: { handle: 'unusual_whales', name: 'Unusual Whales', nitter: 'nitter.poast.org' },
+      // Multiple Nitter instances for fallback (updated Jan 2026)
+      NITTER_INSTANCES: [
+        'nitter.poast.org',
+        'nitter.privacydev.net',
+        'nitter.cz',
+        'nitter.net',
+        'nitter.1d4.us',
+        'nitter.kavin.rocks',
+        'nitter.unixfox.eu',
+      ],
     };
 
     // ==================== TWITTER/X FEED HELPER ====================
@@ -798,52 +816,127 @@
       return null;
     }
 
-    // Fetch Twitter feed via Nitter RSS
+    // Fetch Twitter feed via Nitter RSS with fallback instances
     async function fetchTwitterFeed(feedConfig) {
-      try {
-        const rssUrl = `https://${feedConfig.nitter}/${feedConfig.handle}/rss`;
-        const apiUrl = `${CONFIG.RSS2JSON_API}?rss_url=${encodeURIComponent(rssUrl)}`;
-        
-        const res = await fetch(apiUrl);
-        if (!res.ok) throw new Error('RSS fetch failed');
-        
-        const data = await res.json();
-        if (data.status !== 'ok' || !data.items) return [];
-        
-        return data.items.slice(0, 5).map((item, idx) => {
-          // Clean up tweet text (remove URLs, extra whitespace)
-          let text = item.title || item.description || '';
-          text = text.replace(/https?:\/\/\S+/g, '').trim();
-          text = text.replace(/\s+/g, ' ').substring(0, 200);
+      const handle = feedConfig.handle;
+      const nitterInstances = feedConfig.nitter 
+        ? [feedConfig.nitter, ...CONFIG.NITTER_INSTANCES]
+        : CONFIG.NITTER_INSTANCES;
+      
+      // Method 1: Try RSS2JSON service with each Nitter instance
+      for (const nitter of nitterInstances) {
+        try {
+          const rssUrl = `https://${nitter}/${handle}/rss`;
+          const apiUrl = `${CONFIG.RSS2JSON_API}?rss_url=${encodeURIComponent(rssUrl)}`;
           
-          // Calculate time ago
-          const pubDate = new Date(item.pubDate);
-          const now = new Date();
-          const diffMs = now - pubDate;
-          const diffMins = Math.floor(diffMs / 60000);
-          const diffHours = Math.floor(diffMins / 60);
-          const timeAgo = diffHours > 0 ? `${diffHours}h ago` : `${diffMins}m ago`;
+          console.log(`Trying ${nitter} for @${handle}...`);
           
-          // Get location
-          const loc = extractLocationFromTweet(text);
+          const res = await fetch(apiUrl);
+          if (!res.ok) {
+            console.log(`${nitter} returned ${res.status}, trying next...`);
+            continue;
+          }
           
-          return {
-            id: `${feedConfig.handle}-${idx}-${Date.now()}`,
-            source: `@${feedConfig.handle}`,
-            sourceName: feedConfig.name,
-            text: text,
-            time: timeAgo,
-            timestamp: pubDate,
-            link: item.link,
-            lat: loc?.lat || (Math.random() * 60 - 30),
-            lng: loc?.lng || (Math.random() * 100 - 50),
-            location: loc?.country || 'Unknown',
-          };
-        });
-      } catch (err) {
-        console.log(`Failed to fetch @${feedConfig.handle}:`, err.message);
-        return [];
+          const data = await res.json();
+          if (data.status !== 'ok' || !data.items || data.items.length === 0) {
+            console.log(`${nitter} returned no items, trying next...`);
+            continue;
+          }
+          
+          console.log(`Success! Got ${data.items.length} items from ${nitter}`);
+          
+          return data.items.slice(0, 5).map((item, idx) => {
+            // Clean up tweet text (remove URLs, extra whitespace)
+            let text = item.title || item.description || '';
+            text = text.replace(/<[^>]+>/g, ''); // Remove HTML tags
+            text = text.replace(/https?:\/\/\S+/g, '').trim();
+            text = text.replace(/\s+/g, ' ').substring(0, 200);
+            
+            // Calculate time ago
+            const pubDate = new Date(item.pubDate);
+            const now = new Date();
+            const diffMs = now - pubDate;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            const timeAgo = diffHours > 0 ? `${diffHours}h ago` : `${diffMins}m ago`;
+            
+            // Get location
+            const loc = extractLocationFromTweet(text);
+            
+            return {
+              id: `${handle}-${idx}-${Date.now()}`,
+              source: `@${handle}`,
+              sourceName: feedConfig.name,
+              text: text,
+              time: timeAgo,
+              timestamp: pubDate,
+              link: item.link || `https://x.com/${handle}`,
+              lat: loc?.lat || (Math.random() * 60 - 30),
+              lng: loc?.lng || (Math.random() * 100 - 50),
+              location: loc?.country || 'Unknown',
+            };
+          });
+        } catch (err) {
+          console.log(`Failed ${nitter}: ${err.message}, trying next...`);
+          continue;
+        }
       }
+      
+      // Method 2: Try CORS proxy with Nitter
+      for (const nitter of nitterInstances.slice(0, 2)) {
+        try {
+          const rssUrl = `https://${nitter}/${handle}/rss`;
+          const proxyUrl = `${CONFIG.CORS_PROXY}${encodeURIComponent(rssUrl)}`;
+          
+          console.log(`Trying CORS proxy with ${nitter}...`);
+          
+          const res = await fetch(proxyUrl);
+          if (!res.ok) continue;
+          
+          const xml = await res.text();
+          // Simple XML parsing for RSS items
+          const items = [];
+          const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+          let match;
+          
+          while ((match = itemRegex.exec(xml)) !== null && items.length < 5) {
+            const itemXml = match[1];
+            const title = itemXml.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/)?.[1] || '';
+            const link = itemXml.match(/<link>(.*?)<\/link>/)?.[1] || `https://x.com/${handle}`;
+            const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
+            
+            let text = title.replace(/<[^>]+>/g, '').replace(/https?:\/\/\S+/g, '').trim();
+            if (text.length > 10) {
+              const date = new Date(pubDate);
+              const diffMs = Date.now() - date;
+              const diffHours = Math.floor(diffMs / 3600000);
+              
+              items.push({
+                id: `${handle}-${items.length}-${Date.now()}`,
+                source: `@${handle}`,
+                sourceName: feedConfig.name,
+                text: text.substring(0, 200),
+                time: diffHours > 0 ? `${diffHours}h ago` : 'Just now',
+                timestamp: date,
+                link: link,
+                lat: 38.9 + Math.random() * 2,
+                lng: -77 + Math.random() * 2,
+                location: 'USA',
+              });
+            }
+          }
+          
+          if (items.length > 0) {
+            console.log(`CORS proxy success! Got ${items.length} items`);
+            return items;
+          }
+        } catch (err) {
+          console.log(`CORS proxy failed: ${err.message}`);
+        }
+      }
+      
+      console.log(`All methods failed for @${handle}`);
+      return [];
     }
 
     // Fetch all OSINT feeds
@@ -1271,28 +1364,22 @@
       const [isOnline, setIsOnline] = useState(true);
       const [lastUpdate, setLastUpdate] = useState(new Date());
       const [feedLoading, setFeedLoading] = useState(false);
-      const [potusFeed, setPotusFeed] = useState([]);
-      const [potusLoading, setPotusLoading] = useState(false);
-
-      // Fetch Unusual Whales feed
-      const refreshWhalesFeed = async () => {
-        setPotusLoading(true);
-        try {
-          const tweets = await fetchTwitterFeed(CONFIG.WHALES_FEED);
-          if (tweets.length > 0) {
-            setPotusFeed(tweets);
-          }
-        } catch (err) {
-          console.error('Whales feed error:', err);
-        }
-        setPotusLoading(false);
-      };
-
-      // Fetch Whales on mount
+      // Load Twitter embed widget
       useEffect(() => {
-        const timer = setTimeout(() => refreshWhalesFeed(), 1500);
-        const interval = setInterval(() => refreshWhalesFeed(), 180000); // Every 3 min
-        return () => { clearTimeout(timer); clearInterval(interval); };
+        // Re-render Twitter widgets after component mounts
+        if (window.twttr && window.twttr.widgets) {
+          window.twttr.widgets.load();
+        } else {
+          // Wait for Twitter script to load
+          const checkTwitter = setInterval(() => {
+            if (window.twttr && window.twttr.widgets) {
+              window.twttr.widgets.load();
+              clearInterval(checkTwitter);
+            }
+          }, 500);
+          // Stop checking after 10 seconds
+          setTimeout(() => clearInterval(checkTwitter), 10000);
+        }
       }, []);
 
       // Fetch Twitter/X OSINT feeds
@@ -1606,44 +1693,40 @@
             </div>
           </div>
 
-          {/* Unusual Whales Feed Panel */}
+          {/* Unusual Whales Feed Panel - Twitter Embed */}
           <div className="potus-panel">
             <div className="potus-header" style={{background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(16, 185, 129, 0.2))'}}>
-              <div className="potus-avatar" style={{background: 'linear-gradient(135deg, #3b82f6, #10b981)'}}>🐋</div>
-              <div className="potus-title">
-                <h3>
-                  @unusual_whales
-                  <span className="verified">✓</span>
-                </h3>
-                <p>Market Flow & Political Trades</p>
-              </div>
-              <button 
-                className="potus-refresh"
-                onClick={refreshWhalesFeed}
-                disabled={potusLoading}
-              >
-                {potusLoading ? '↻...' : '↻'}
-              </button>
-            </div>
-            <div className="potus-content">
-              {potusFeed.length === 0 ? (
-                <div className="potus-empty">
-                  {potusLoading ? 'Loading tweets...' : 'Click refresh to load @unusual_whales feed'}
+              <a href="https://x.com/unusual_whales" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', flex: 1}}>
+                <div className="potus-avatar" style={{background: 'linear-gradient(135deg, #3b82f6, #10b981)'}}>🐋</div>
+                <div className="potus-title">
+                  <h3>
+                    @unusual_whales
+                    <span className="verified">✓</span>
+                  </h3>
+                  <p>Market Flow & Political Trades</p>
                 </div>
-              ) : (
-                potusFeed.slice(0, 5).map(tweet => (
-                  <a 
-                    key={tweet.id}
-                    href={tweet.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="potus-tweet"
-                  >
-                    <div className="potus-tweet-text">{tweet.text}</div>
-                    <div className="potus-tweet-time">{tweet.time}</div>
-                  </a>
-                ))
-              )}
+              </a>
+              <a 
+                href="https://x.com/unusual_whales" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="potus-refresh"
+                style={{textDecoration: 'none'}}
+              >
+                Open ↗
+              </a>
+            </div>
+            <div className="potus-content" style={{padding: 0, maxHeight: '280px'}}>
+              <a 
+                className="twitter-timeline" 
+                data-theme="dark"
+                data-chrome="noheader nofooter noborders transparent"
+                data-height="280"
+                data-width="320"
+                href="https://twitter.com/unusual_whales?ref_src=twsrc%5Etfw"
+              >
+                Loading @unusual_whales...
+              </a>
             </div>
           </div>
 
