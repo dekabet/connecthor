@@ -384,9 +384,11 @@
     /* Selected Market Detail */
     .detail-panel {
       position: absolute;
-      bottom: 16px; left: 16px;
-      width: 400px;
-      z-index: 50;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 420px;
+      z-index: 60;
       background: var(--bg-card);
       backdrop-filter: blur(12px);
       border: 1px solid var(--border);
@@ -508,7 +510,8 @@
     /* Legend */
     .legend {
       position: absolute;
-      bottom: 16px; right: 16px;
+      bottom: 320px;
+      left: 16px;
       z-index: 40;
       background: var(--bg-card);
       backdrop-filter: blur(12px);
@@ -607,11 +610,126 @@
     
     .status-dot.offline { background: var(--accent-red); animation: none; }
     
+    /* POTUS Feed Panel */
+    .potus-panel {
+      position: absolute;
+      bottom: 100px;
+      left: 16px;
+      width: 320px;
+      z-index: 50;
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    
+    .potus-header {
+      padding: 12px 14px;
+      background: linear-gradient(135deg, rgba(29, 78, 137, 0.3), rgba(59, 130, 246, 0.2));
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .potus-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1d4e89, #3b82f6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      border: 2px solid rgba(255,255,255,0.2);
+    }
+    
+    .potus-title {
+      flex: 1;
+    }
+    
+    .potus-title h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: white;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .potus-title h3 .verified {
+      color: #1d9bf0;
+      font-size: 14px;
+    }
+    
+    .potus-title p {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    
+    .potus-content {
+      max-height: 200px;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    
+    .potus-tweet {
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      transition: background 0.15s;
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+    
+    .potus-tweet:hover {
+      background: rgba(59, 130, 246, 0.1);
+    }
+    
+    .potus-tweet-text {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    
+    .potus-tweet-time {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    
+    .potus-refresh {
+      padding: 4px 10px;
+      font-size: 10px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    
+    .potus-refresh:hover {
+      background: rgba(59, 130, 246, 0.25);
+    }
+    
+    .potus-empty {
+      padding: 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+    
     @media (max-width: 900px) {
       .markets-panel { display: none; }
-      .detail-panel { left: 12px; right: 12px; width: auto; }
+      .detail-panel { left: 12px; right: 12px; width: auto; bottom: 80px; transform: none; }
       .search-input { width: 150px; }
       .stats-bar { flex-direction: column; }
+      .potus-panel { display: none; }
+      .legend { bottom: 60px; left: 12px; }
     }
   </style>
 </head>
@@ -644,6 +762,8 @@
       // OPTIONAL: Deploy cloudflare-worker.js and set your URL here for more reliable feeds
       // TWITTER_WORKER: 'https://your-worker.your-subdomain.workers.dev/feed',
       TWITTER_WORKER: null, // Set to your worker URL to enable
+      // POTUS official account feed
+      POTUS_FEED: { handle: 'POTUS', name: 'President of the United States', nitter: 'nitter.poast.org' },
     };
 
     // ==================== TWITTER/X FEED HELPER ====================
@@ -1060,6 +1180,29 @@
       const [isOnline, setIsOnline] = useState(true);
       const [lastUpdate, setLastUpdate] = useState(new Date());
       const [feedLoading, setFeedLoading] = useState(false);
+      const [potusFeed, setPotusFeed] = useState([]);
+      const [potusLoading, setPotusLoading] = useState(false);
+
+      // Fetch POTUS feed
+      const refreshPotusFeed = async () => {
+        setPotusLoading(true);
+        try {
+          const tweets = await fetchTwitterFeed(CONFIG.POTUS_FEED);
+          if (tweets.length > 0) {
+            setPotusFeed(tweets);
+          }
+        } catch (err) {
+          console.error('POTUS feed error:', err);
+        }
+        setPotusLoading(false);
+      };
+
+      // Fetch POTUS on mount
+      useEffect(() => {
+        const timer = setTimeout(() => refreshPotusFeed(), 1500);
+        const interval = setInterval(() => refreshPotusFeed(), 180000); // Every 3 min
+        return () => { clearTimeout(timer); clearInterval(interval); };
+      }, []);
 
       // Fetch Twitter/X OSINT feeds
       const refreshOsintFeed = async () => {
@@ -1365,6 +1508,47 @@
                 {news.length > 0 && <span style={{width: '6px', height: '6px', background: '#ef4444', borderRadius: '50%', animation: 'pulse 2s infinite'}}></span>}
                 {news.length}
               </div>
+            </div>
+          </div>
+
+          {/* POTUS Feed Panel */}
+          <div className="potus-panel">
+            <div className="potus-header">
+              <div className="potus-avatar">🇺🇸</div>
+              <div className="potus-title">
+                <h3>
+                  @POTUS
+                  <span className="verified">✓</span>
+                </h3>
+                <p>President of the United States</p>
+              </div>
+              <button 
+                className="potus-refresh"
+                onClick={refreshPotusFeed}
+                disabled={potusLoading}
+              >
+                {potusLoading ? '↻...' : '↻'}
+              </button>
+            </div>
+            <div className="potus-content">
+              {potusFeed.length === 0 ? (
+                <div className="potus-empty">
+                  {potusLoading ? 'Loading tweets...' : 'Click refresh to load @POTUS feed'}
+                </div>
+              ) : (
+                potusFeed.slice(0, 5).map(tweet => (
+                  <a 
+                    key={tweet.id}
+                    href={tweet.link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="potus-tweet"
+                  >
+                    <div className="potus-tweet-text">{tweet.text}</div>
+                    <div className="potus-tweet-time">{tweet.time}</div>
+                  </a>
+                ))
+              )}
             </div>
           </div>
 
