@@ -626,7 +626,7 @@
     
     .status-dot.offline { background: var(--accent-red); animation: none; }
     
-    /* POTUS Feed Panel */
+    /* Unusual Whales Feed Panel */
     .potus-panel {
       position: absolute;
       bottom: 100px;
@@ -642,7 +642,7 @@
     
     .potus-header {
       padding: 12px 14px;
-      background: linear-gradient(135deg, rgba(29, 78, 137, 0.3), rgba(59, 130, 246, 0.2));
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(16, 185, 129, 0.2));
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -653,7 +653,7 @@
       width: 36px;
       height: 36px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #1d4e89, #3b82f6);
+      background: linear-gradient(135deg, #3b82f6, #10b981);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -675,7 +675,7 @@
     }
     
     .potus-title h3 .verified {
-      color: #1d9bf0;
+      color: #10b981;
       font-size: 14px;
     }
     
@@ -702,7 +702,7 @@
     }
     
     .potus-tweet:hover {
-      background: rgba(59, 130, 246, 0.1);
+      background: rgba(16, 185, 129, 0.1);
     }
     
     .potus-tweet-text {
@@ -720,16 +720,16 @@
     .potus-refresh {
       padding: 4px 10px;
       font-size: 10px;
-      background: rgba(59, 130, 246, 0.15);
-      color: #60a5fa;
-      border: 1px solid rgba(59, 130, 246, 0.3);
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
       border-radius: 6px;
       cursor: pointer;
       transition: all 0.15s;
     }
     
     .potus-refresh:hover {
-      background: rgba(59, 130, 246, 0.25);
+      background: rgba(16, 185, 129, 0.25);
     }
     
     .potus-empty {
@@ -778,8 +778,8 @@
       // OPTIONAL: Deploy cloudflare-worker.js and set your URL here for more reliable feeds
       // TWITTER_WORKER: 'https://your-worker.your-subdomain.workers.dev/feed',
       TWITTER_WORKER: null, // Set to your worker URL to enable
-      // POTUS official account feed
-      POTUS_FEED: { handle: 'POTUS', name: 'President of the United States', nitter: 'nitter.poast.org' },
+      // unusual_whales feed (market news & political moves)
+      WHALES_FEED: { handle: 'unusual_whales', name: 'Unusual Whales', nitter: 'nitter.poast.org' },
     };
 
     // ==================== TWITTER/X FEED HELPER ====================
@@ -1274,24 +1274,24 @@
       const [potusFeed, setPotusFeed] = useState([]);
       const [potusLoading, setPotusLoading] = useState(false);
 
-      // Fetch POTUS feed
-      const refreshPotusFeed = async () => {
+      // Fetch Unusual Whales feed
+      const refreshWhalesFeed = async () => {
         setPotusLoading(true);
         try {
-          const tweets = await fetchTwitterFeed(CONFIG.POTUS_FEED);
+          const tweets = await fetchTwitterFeed(CONFIG.WHALES_FEED);
           if (tweets.length > 0) {
             setPotusFeed(tweets);
           }
         } catch (err) {
-          console.error('POTUS feed error:', err);
+          console.error('Whales feed error:', err);
         }
         setPotusLoading(false);
       };
 
-      // Fetch POTUS on mount
+      // Fetch Whales on mount
       useEffect(() => {
-        const timer = setTimeout(() => refreshPotusFeed(), 1500);
-        const interval = setInterval(() => refreshPotusFeed(), 180000); // Every 3 min
+        const timer = setTimeout(() => refreshWhalesFeed(), 1500);
+        const interval = setInterval(() => refreshWhalesFeed(), 180000); // Every 3 min
         return () => { clearTimeout(timer); clearInterval(interval); };
       }, []);
 
@@ -1606,20 +1606,20 @@
             </div>
           </div>
 
-          {/* POTUS Feed Panel */}
+          {/* Unusual Whales Feed Panel */}
           <div className="potus-panel">
-            <div className="potus-header">
-              <div className="potus-avatar">🇺🇸</div>
+            <div className="potus-header" style={{background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(16, 185, 129, 0.2))'}}>
+              <div className="potus-avatar" style={{background: 'linear-gradient(135deg, #3b82f6, #10b981)'}}>🐋</div>
               <div className="potus-title">
                 <h3>
-                  @POTUS
+                  @unusual_whales
                   <span className="verified">✓</span>
                 </h3>
-                <p>President of the United States</p>
+                <p>Market Flow & Political Trades</p>
               </div>
               <button 
                 className="potus-refresh"
-                onClick={refreshPotusFeed}
+                onClick={refreshWhalesFeed}
                 disabled={potusLoading}
               >
                 {potusLoading ? '↻...' : '↻'}
@@ -1628,7 +1628,7 @@
             <div className="potus-content">
               {potusFeed.length === 0 ? (
                 <div className="potus-empty">
-                  {potusLoading ? 'Loading tweets...' : 'Click refresh to load @POTUS feed'}
+                  {potusLoading ? 'Loading tweets...' : 'Click refresh to load @unusual_whales feed'}
                 </div>
               ) : (
                 potusFeed.slice(0, 5).map(tweet => (
