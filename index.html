@@ -582,6 +582,22 @@
     
     .category-tab:hover { background: var(--border); color: var(--text-primary); }
     .category-tab.active { background: var(--accent-blue); color: white; }
+    .category-tab.trump { 
+      background: linear-gradient(135deg, rgba(220, 38, 38, 0.2), rgba(59, 130, 246, 0.2));
+      border: 1px solid rgba(220, 38, 38, 0.3);
+    }
+    .category-tab.trump.active {
+      background: linear-gradient(135deg, #dc2626, #2563eb);
+    }
+    
+    /* Trump market highlight */
+    .market-item.trump-market {
+      border-left: 2px solid rgba(220, 38, 38, 0.5);
+    }
+    
+    .market-item.trump-market .market-item-location {
+      color: #f87171;
+    }
     
     /* Status indicator */
     .status-bar {
@@ -1049,8 +1065,70 @@
       'crypto': { lat: 37.77, lng: -122.42, country: 'Global', region: 'Americas' },
     };
 
-    // ==================== SAMPLE MARKETS DATA (50+) ====================
-    const SAMPLE_MARKETS = [
+    // ==================== SAMPLE MARKETS DATA (Trump prioritized, then others) ====================
+    
+    // TRUMP MARKETS (Prioritized - from polymarket.com/politics/trump) - Updated Jan 19, 2026
+    const TRUMP_MARKETS = [
+      // Highest Volume Markets
+      { id: 'trump-1', question: 'Who will Trump nominate as Fed Chair?', outcomePrices: '0.62,0.38', volume: '216000000', slug: 'who-will-trump-nominate-as-fed-chair', endDate: '2027-01-20', category: 'Trump', topOutcome: 'Kevin Warsh 62%' },
+      { id: 'trump-2', question: 'Will Trump acquire Greenland before 2027?', outcomePrices: '0.20,0.80', volume: '16000000', slug: 'will-trump-acquire-greenland-before-2027', endDate: '2027-01-01', category: 'Trump' },
+      { id: 'trump-3', question: 'Venezuela leader end of 2026?', outcomePrices: '0.54,0.46', volume: '8000000', slug: 'venezuela-leader-end-of-2026', endDate: '2026-12-31', category: 'Trump', topOutcome: 'Delcy Rodríguez 54%' },
+      { id: 'trump-4', question: 'Will Melania say "Career" during AI talk on Friday?', outcomePrices: '0.01,0.99', volume: '6000000', slug: 'melania-ai-talk', endDate: '2026-01-17', category: 'Trump' },
+      { id: 'trump-5', question: 'How many people will Trump deport in 2025?', outcomePrices: '0.87,0.13', volume: '5000000', slug: 'how-many-people-will-trump-deport-in-2025', endDate: '2025-12-31', category: 'Trump', topOutcome: '250-500k 87%' },
+      
+      // Tariffs & Trade
+      { id: 'trump-6', question: 'How much revenue will the U.S. raise from tariffs in 2025?', outcomePrices: '0.57,0.43', volume: '3000000', slug: 'us-tariff-revenue-2025', endDate: '2025-12-31', category: 'Trump', topOutcome: '<$100b 57%' },
+      { id: 'trump-7', question: 'Supreme Court rules in favor of Trump\'s tariffs?', outcomePrices: '0.30,0.70', volume: '3000000', slug: 'supreme-court-trump-tariffs', endDate: '2026-12-31', category: 'Trump' },
+      { id: 'trump-8', question: 'Will the Court Force Trump to Refund Tariffs?', outcomePrices: '0.22,0.78', volume: '1500000', slug: 'court-trump-refund-tariffs', endDate: '2026-06-30', category: 'Trump' },
+      { id: 'trump-9', question: 'Will any of Trump\'s Greenland Tariffs go into effect by Feb 1?', outcomePrices: '0.42,0.58', volume: '97000', slug: 'trump-greenland-tariffs-feb', endDate: '2026-02-01', category: 'Trump' },
+      { id: 'trump-10', question: 'Will all of Trump\'s Greenland Tariffs go into effect by Feb 1?', outcomePrices: '0.17,0.83', volume: '49000', slug: 'trump-all-greenland-tariffs-feb', endDate: '2026-02-01', category: 'Trump' },
+      
+      // Greenland
+      { id: 'trump-11', question: 'Will the US acquire part of Greenland in 2026?', outcomePrices: '0.24,0.76', volume: '3000000', slug: 'us-acquire-greenland-2026', endDate: '2026-12-31', category: 'Trump' },
+      { id: 'trump-12', question: 'Odds Trump acquires Greenland before 2027 hit 30% by March 31?', outcomePrices: '0.28,0.72', volume: '469000', slug: 'trump-greenland-odds-30', endDate: '2026-03-31', category: 'Trump' },
+      { id: 'trump-13', question: 'Which countries will Trump\'s Greenland Tariffs go into effect for by Feb 1?', outcomePrices: '0.38,0.62', volume: '90000', slug: 'trump-greenland-tariffs-countries', endDate: '2026-02-01', category: 'Trump', topOutcome: 'Denmark 38%' },
+      
+      // Venezuela
+      { id: 'trump-14', question: 'María Corina Machado enters Venezuela by March 31?', outcomePrices: '0.37,0.63', volume: '3000000', slug: 'machado-enters-venezuela', endDate: '2026-03-31', category: 'Trump' },
+      { id: 'trump-15', question: 'U.S. recognizes Machado as leader of Venezuela by January 31?', outcomePrices: '0.01,0.99', volume: '1000000', slug: 'us-recognizes-machado', endDate: '2026-01-31', category: 'Trump' },
+      { id: 'trump-16', question: 'US forces in Venezuela again by June 30, 2026?', outcomePrices: '0.26,0.74', volume: '2500000', slug: 'us-forces-venezuela', endDate: '2026-06-30', category: 'Trump' },
+      
+      // Iran & Middle East
+      { id: 'trump-17', question: 'Will the Iranian regime fall before 2027?', outcomePrices: '0.36,0.64', volume: '3000000', slug: 'iranian-regime-fall-2027', endDate: '2027-01-01', category: 'Trump' },
+      { id: 'trump-18', question: 'Will the US officially declare war on Iran by December 31, 2026?', outcomePrices: '0.14,0.86', volume: '1500000', slug: 'us-declare-war-iran', endDate: '2026-12-31', category: 'Trump' },
+      
+      // Cabinet & Administration  
+      { id: 'trump-19', question: 'Who will be the first to leave the Trump Cabinet?', outcomePrices: '0.29,0.71', volume: '1000000', slug: 'first-leave-trump-cabinet', endDate: '2026-12-31', category: 'Trump', topOutcome: 'Pam Bondi 29%' },
+      { id: 'trump-20', question: 'Jerome Powell out as Fed Chair by March 31?', outcomePrices: '0.05,0.95', volume: '545000', slug: 'jerome-powell-out-march', endDate: '2026-03-31', category: 'Trump' },
+      { id: 'trump-21', question: 'Jerome Powell out as Fed Chair by May 14?', outcomePrices: '0.09,0.91', volume: '545000', slug: 'jerome-powell-out-may', endDate: '2026-05-14', category: 'Trump' },
+      { id: 'trump-22', question: 'Will J.D. Vance be the first to leave the Trump Cabinet before 2027?', outcomePrices: '0.01,0.99', volume: '200000', slug: 'jd-vance-leave-cabinet', endDate: '2027-01-01', category: 'Trump' },
+      
+      // Military & Security
+      { id: 'trump-23', question: 'Next Country US Strikes', outcomePrices: '0.68,0.32', volume: '701000', slug: 'next-country-us-strikes', endDate: '2026-06-30', category: 'Trump', topOutcome: 'Somalia 68%' },
+      { id: 'trump-24', question: 'U.S. strike on Somalia by January 31?', outcomePrices: '0.73,0.27', volume: '252000', slug: 'us-strike-somalia', endDate: '2026-01-31', category: 'Trump' },
+      { id: 'trump-25', question: 'Insurrection Act invoked by January 31?', outcomePrices: '0.14,0.86', volume: '312000', slug: 'insurrection-act-jan', endDate: '2026-01-31', category: 'Trump' },
+      { id: 'trump-26', question: 'Insurrection Act invoked by March 31?', outcomePrices: '0.32,0.68', volume: '312000', slug: 'insurrection-act-march', endDate: '2026-03-31', category: 'Trump' },
+      
+      // Immigration & Deportation
+      { id: 'trump-27', question: 'Will Trump deport 750,000 or more people in 2025?', outcomePrices: '0.04,0.96', volume: '396000', slug: 'trump-deport-750k', endDate: '2025-12-31', category: 'Trump' },
+      { id: 'trump-28', question: 'Will Trump deport less than 250,000?', outcomePrices: '0.02,0.98', volume: '396000', slug: 'trump-deport-less-250k', endDate: '2025-12-31', category: 'Trump' },
+      { id: 'trump-29', question: 'Trump suspends U.S. entry for more countries by June 30?', outcomePrices: '0.49,0.51', volume: '250000', slug: 'trump-entry-ban', endDate: '2026-06-30', category: 'Trump' },
+      
+      // Impeachment & Approval
+      { id: 'trump-30', question: 'Trump impeached by end of 2026?', outcomePrices: '0.13,0.87', volume: '246000', slug: 'trump-impeached-2026', endDate: '2026-12-31', category: 'Trump' },
+      { id: 'trump-31', question: 'Will Trump resign by December 31, 2026?', outcomePrices: '0.07,0.93', volume: '150000', slug: 'trump-resign-2026', endDate: '2026-12-31', category: 'Trump' },
+      { id: 'trump-32', question: 'Will Trump\'s approval rating hit 44% in 2026?', outcomePrices: '0.37,0.63', volume: '200000', slug: 'trump-approval-44', endDate: '2026-12-31', category: 'Trump' },
+      
+      // DOGE & Budget
+      { id: 'trump-33', question: 'Will Elon cut the budget by at least 5% in 2025?', outcomePrices: '0.01,0.99', volume: '500000', slug: 'elon-cut-budget-5', endDate: '2025-12-31', category: 'Trump' },
+      
+      // Foreign Policy
+      { id: 'trump-34', question: 'Russia x Ukraine ceasefire by March 31, 2026?', outcomePrices: '0.12,0.88', volume: '3000000', slug: 'russia-ukraine-ceasefire', endDate: '2026-03-31', category: 'Trump' },
+      { id: 'trump-35', question: 'Will Trump and Putin meet next in Belarus?', outcomePrices: '0.25,0.75', volume: '150000', slug: 'trump-putin-belarus', endDate: '2026-06-30', category: 'Trump' },
+      { id: 'trump-36', question: 'Will Trump recognize Somaliland before 2027?', outcomePrices: '0.36,0.64', volume: '58600', slug: 'trump-recognize-somaliland', endDate: '2027-01-01', category: 'Trump' },
+    ];
+
+    const OTHER_MARKETS = [
       // Ukraine/Russia conflict
       { id: '1', question: 'Will Russia capture Pokrovsk by March 2026?', outcomePrices: '0.35,0.65', volume: '2700000', slug: 'russia-capture-pokrovsk', endDate: '2026-03-31', category: 'Conflict' },
       { id: '2', question: 'Will there be a Ukraine ceasefire in 2026?', outcomePrices: '0.42,0.58', volume: '8500000', slug: 'ukraine-ceasefire-2026', endDate: '2026-12-31', category: 'Conflict' },
@@ -1127,6 +1205,9 @@
       { id: '55', question: 'Will Serbia-Kosovo tensions escalate to conflict?', outcomePrices: '0.22,0.78', volume: '290000', slug: 'serbia-kosovo', endDate: '2026-12-31', category: 'Conflict' },
     ];
 
+    // Combine: Trump markets first (prioritized), then other markets
+    const SAMPLE_MARKETS = [...TRUMP_MARKETS, ...OTHER_MARKETS];
+
     // ==================== NEWS/OSINT DATA ====================
     const SAMPLE_NEWS = [
       { id: 1, source: 'OSINT Aggregator', text: 'Heavy artillery exchanges reported near Pokrovsk front lines. Ukrainian forces reinforcing positions.', time: '12m ago', lat: 48.28, lng: 37.18, location: 'Pokrovsk, Ukraine' },
@@ -1143,6 +1224,16 @@
 
     // ==================== HELPER FUNCTIONS ====================
     function getLocation(market) {
+      // Trump markets always center around Washington DC with spread
+      if (market.category === 'Trump') {
+        return {
+          lat: 38.9 + (Math.random() - 0.5) * 3,
+          lng: -77.0 + (Math.random() - 0.5) * 6,
+          country: 'USA',
+          region: 'Americas'
+        };
+      }
+      
       const text = `${market.question || ''} ${market.title || ''} ${market.description || ''}`.toLowerCase();
       for (const [keyword, loc] of Object.entries(LOCATIONS)) {
         if (text.includes(keyword.toLowerCase())) {
@@ -1175,7 +1266,7 @@
       const [showOSINT, setShowOSINT] = useState(true);
       const [showBorders, setShowBorders] = useState(true);
       const [liveLoading, setLiveLoading] = useState(false);
-      const [category, setCategory] = useState('All');
+      const [category, setCategory] = useState('Trump');
       const [countries, setCountries] = useState({ features: [] });
       const [isOnline, setIsOnline] = useState(true);
       const [lastUpdate, setLastUpdate] = useState(new Date());
@@ -1387,10 +1478,11 @@
         setLiveLoading(false);
       };
 
-      // Categories
+      // Categories - Trump first
       const categories = useMemo(() => {
-        const cats = ['All', ...new Set(markets.map(m => m.category).filter(Boolean))];
-        return cats;
+        const cats = new Set(markets.map(m => m.category).filter(Boolean));
+        // Ensure Trump is first, then All, then others
+        return ['Trump', 'All', ...Array.from(cats).filter(c => c !== 'Trump').sort()];
       }, [markets]);
 
       // Filter markets
@@ -1414,8 +1506,11 @@
         (filtered.reduce((s, m) => s + parseFloat(m.volume || 0), 0) / 1e6).toFixed(1)
       , [filtered]);
 
-      // Color helpers
+      // Color helpers - Trump markets get special color
       const getColor = useCallback((m) => {
+        // Trump markets are red-white-blue gradient effect (show as red)
+        if (m.category === 'Trump') return '#dc2626';
+        
         if (m.yesPrice >= 0.7) return '#22c55e';
         if (m.yesPrice >= 0.4) return '#eab308';
         return '#ef4444';
@@ -1495,11 +1590,11 @@
           {/* Stats */}
           <div className="stats-bar">
             <div className="stat-card">
-              <div className="stat-label">Active Markets</div>
+              <div className="stat-label">{category === 'Trump' ? 'Trump Markets' : 'Active Markets'}</div>
               <div className="stat-value">{filtered.length}</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">Total Volume</div>
+              <div className="stat-label">{category === 'Trump' ? 'Trump Volume' : 'Total Volume'}</div>
               <div className="stat-value green">${totalVolume}M</div>
             </div>
             <div className="stat-card">
@@ -1575,9 +1670,10 @@
             pointColor={getColor}
             pointRadius={0.4}
             pointLabel={d => `
-              <div style="background:rgba(10,15,26,0.95);padding:14px 18px;border-radius:12px;border:1px solid rgba(59,130,246,0.3);max-width:300px;backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.4);">
-                <div style="font-size:10px;color:#60a5fa;font-weight:600;margin-bottom:4px;">📍 ${d.country} • ${d.category || 'Politics'}</div>
+              <div style="background:rgba(10,15,26,0.95);padding:14px 18px;border-radius:12px;border:1px solid ${d.category === 'Trump' ? 'rgba(220,38,38,0.4)' : 'rgba(59,130,246,0.3)'};max-width:300px;backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+                <div style="font-size:10px;color:${d.category === 'Trump' ? '#f87171' : '#60a5fa'};font-weight:600;margin-bottom:4px;">${d.category === 'Trump' ? '🇺🇸 Trump' : '📍 ' + d.country} • ${d.category || 'Politics'}</div>
                 <div style="font-weight:600;color:white;margin-bottom:10px;font-size:13px;line-height:1.4;">${d.question}</div>
+                ${d.topOutcome ? `<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Leading: ${d.topOutcome}</div>` : ''}
                 <div style="display:flex;gap:20px;">
                   <div>
                     <div style="color:#6b7280;font-size:9px;text-transform:uppercase;">Yes</div>
@@ -1639,13 +1735,13 @@
                 <span className="panel-badge">{filtered.length}</span>
               </div>
               <div className="category-tabs">
-                {categories.slice(0, 6).map(cat => (
+                {categories.slice(0, 7).map(cat => (
                   <button
                     key={cat}
-                    className={`category-tab ${category === cat ? 'active' : ''}`}
+                    className={`category-tab ${category === cat ? 'active' : ''} ${cat === 'Trump' ? 'trump' : ''}`}
                     onClick={() => setCategory(cat)}
                   >
-                    {cat}
+                    {cat === 'Trump' ? '🇺🇸 Trump' : cat}
                   </button>
                 ))}
               </div>
@@ -1653,13 +1749,20 @@
                 {filtered.slice(0, 12).map(m => (
                   <button
                     key={m.id}
-                    className={`market-item ${selected?.id === m.id ? 'active' : ''}`}
+                    className={`market-item ${selected?.id === m.id ? 'active' : ''} ${m.category === 'Trump' ? 'trump-market' : ''}`}
                     onClick={() => setSelected(m)}
                   >
                     <div className="market-item-header">
                       <div style={{flex: 1, minWidth: 0}}>
-                        <div className="market-item-location">📍 {m.country}</div>
+                        <div className="market-item-location">
+                          {m.category === 'Trump' ? '🇺🇸' : '📍'} {m.category === 'Trump' ? 'Trump' : m.country}
+                        </div>
                         <div className="market-item-title">{m.question}</div>
+                        {m.topOutcome && (
+                          <div style={{fontSize: '10px', color: '#9ca3af', marginTop: '2px'}}>
+                            Top: {m.topOutcome}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <div className={`market-item-prob ${getProbClass(m.yesPrice)}`}>
@@ -1718,11 +1821,18 @@
 
           {/* Selected Detail */}
           {selected && (
-            <div className="detail-panel">
+            <div className="detail-panel" style={selected.category === 'Trump' ? {borderColor: 'rgba(220, 38, 38, 0.4)'} : {}}>
               <div className="detail-header">
                 <div>
-                  <div className="detail-location">📍 {selected.country} • {selected.category}</div>
+                  <div className="detail-location" style={selected.category === 'Trump' ? {color: '#f87171'} : {}}>
+                    {selected.category === 'Trump' ? '🇺🇸 Trump Administration' : `📍 ${selected.country} • ${selected.category}`}
+                  </div>
                   <div className="detail-title">{selected.question}</div>
+                  {selected.topOutcome && (
+                    <div style={{fontSize: '11px', color: '#9ca3af', marginTop: '4px'}}>
+                      Leading: {selected.topOutcome}
+                    </div>
+                  )}
                 </div>
                 <button className="detail-close" onClick={() => setSelected(null)}>×</button>
               </div>
@@ -1772,7 +1882,12 @@
 
           {/* Legend */}
           <div className="legend">
-            <div className="legend-title">Market Probability</div>
+            <div className="legend-title">Market Indicators</div>
+            <div className="legend-item">
+              <div className="legend-dot" style={{background: '#dc2626'}}></div>
+              <span>🇺🇸 Trump Markets</span>
+            </div>
+            <div className="legend-divider"></div>
             <div className="legend-item">
               <div className="legend-dot green"></div>
               <span>High (70%+)</span>
