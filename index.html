@@ -687,9 +687,8 @@
     }
     
     .potus-content {
-      max-height: 200px;
+      max-height: 260px;
       overflow-y: auto;
-      padding: 8px;
     }
     
     .potus-tweet {
@@ -743,10 +742,25 @@
     /* Twitter embed customization */
     .potus-content .twitter-timeline {
       display: block !important;
+      text-decoration: none;
+      color: inherit;
     }
     
+    .potus-content .twitter-timeline-rendered {
+      border-radius: 0 0 12px 12px !important;
+    }
+    
+    /* When Twitter embed loads, it replaces content with iframe */
     .potus-content iframe {
       border-radius: 0 0 12px 12px !important;
+      border: none !important;
+    }
+    
+    /* Sample tweet styling for fallback */
+    .potus-content .potus-tweet {
+      display: block;
+      text-decoration: none;
+      color: inherit;
     }
     
     @media (max-width: 900px) {
@@ -1364,22 +1378,21 @@
       const [isOnline, setIsOnline] = useState(true);
       const [lastUpdate, setLastUpdate] = useState(new Date());
       const [feedLoading, setFeedLoading] = useState(false);
-      // Load Twitter embed widget
+      // Load Twitter embed widget (optional enhancement - fallback content shown if blocked)
       useEffect(() => {
-        // Re-render Twitter widgets after component mounts
-        if (window.twttr && window.twttr.widgets) {
-          window.twttr.widgets.load();
-        } else {
-          // Wait for Twitter script to load
-          const checkTwitter = setInterval(() => {
-            if (window.twttr && window.twttr.widgets) {
-              window.twttr.widgets.load();
-              clearInterval(checkTwitter);
-            }
-          }, 500);
-          // Stop checking after 10 seconds
-          setTimeout(() => clearInterval(checkTwitter), 10000);
-        }
+        const loadTwitterWidget = () => {
+          if (window.twttr?.widgets) {
+            window.twttr.widgets.load();
+          }
+        };
+        
+        // Try immediately
+        loadTwitterWidget();
+        
+        // Retry after a delay in case script loads late
+        const timer = setTimeout(loadTwitterWidget, 2000);
+        
+        return () => clearTimeout(timer);
       }, []);
 
       // Fetch Twitter/X OSINT feeds
@@ -1693,7 +1706,7 @@
             </div>
           </div>
 
-          {/* Unusual Whales Feed Panel - Twitter Embed */}
+          {/* Unusual Whales Feed Panel */}
           <div className="potus-panel">
             <div className="potus-header" style={{background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(16, 185, 129, 0.2))'}}>
               <a href="https://x.com/unusual_whales" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', flex: 1}}>
@@ -1703,7 +1716,7 @@
                     @unusual_whales
                     <span className="verified">✓</span>
                   </h3>
-                  <p>Market Flow & Political Trades</p>
+                  <p>Options Flow & Congress Trades</p>
                 </div>
               </a>
               <a 
@@ -1713,19 +1726,48 @@
                 className="potus-refresh"
                 style={{textDecoration: 'none'}}
               >
-                Open ↗
+                Live ↗
               </a>
             </div>
-            <div className="potus-content" style={{padding: 0, maxHeight: '280px'}}>
+            <div className="potus-content" style={{padding: 0}}>
+              {/* Twitter Timeline Embed - will replace content if it loads */}
               <a 
                 className="twitter-timeline" 
                 data-theme="dark"
                 data-chrome="noheader nofooter noborders transparent"
-                data-height="280"
-                data-width="320"
-                href="https://twitter.com/unusual_whales?ref_src=twsrc%5Etfw"
+                data-height="250"
+                data-width="318"
+                data-dnt="true"
+                href="https://twitter.com/unusual_whales"
               >
-                Loading @unusual_whales...
+                {/* Fallback content shown while loading or if blocked */}
+                <div style={{padding: '8px'}}>
+                  <div className="potus-tweet" style={{borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '8px'}}>
+                    <div className="potus-tweet-text">🔴 Large $SPY put sweep - $2.4M premium detected at the ask</div>
+                    <div className="potus-tweet-time">Sample • View live on X</div>
+                  </div>
+                  <div className="potus-tweet" style={{borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '8px'}}>
+                    <div className="potus-tweet-text">BREAKING: Congress member disclosed new $NVDA purchase worth $500K+</div>
+                    <div className="potus-tweet-time">Sample • View live on X</div>
+                  </div>
+                  <div className="potus-tweet" style={{borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '8px'}}>
+                    <div className="potus-tweet-text">⚠️ Unusual call activity in defense sector ahead of announcement</div>
+                    <div className="potus-tweet-time">Sample • View live on X</div>
+                  </div>
+                  <div style={{textAlign: 'center', padding: '12px'}}>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '8px 16px', 
+                      background: 'rgba(16, 185, 129, 0.15)', 
+                      borderRadius: '6px', 
+                      border: '1px solid rgba(16, 185, 129, 0.3)',
+                      color: '#34d399',
+                      fontSize: '12px'
+                    }}>
+                      Click for Live Feed →
+                    </span>
+                  </div>
+                </div>
               </a>
             </div>
           </div>
