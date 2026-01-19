@@ -629,7 +629,102 @@
       REFRESH_INTERVAL: 60000,
       // Smaller simplified borders (~500KB vs ~23MB)
       COUNTRIES_GEOJSON: 'https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson',
+      // RSS to JSON service (free tier: 10k requests/day)
+      RSS2JSON_API: 'https://api.rss2json.com/v1/api.json',
+      // OSINT Twitter/X accounts to follow (via Nitter RSS)
+      OSINT_FEEDS: [
+        { handle: 'Liveuamap', name: 'Liveuamap', nitter: 'nitter.poast.org' },
+        { handle: 'sentdefender', name: 'Sentinel', nitter: 'nitter.poast.org' },
+        { handle: 'TheStudyofWar', name: 'War Studies', nitter: 'nitter.poast.org' },
+        { handle: 'ELINTNews', name: 'ELINT News', nitter: 'nitter.poast.org' },
+        { handle: 'War_Mapper', name: 'War Mapper', nitter: 'nitter.poast.org' },
+        { handle: 'RALee85', name: 'Rob Lee', nitter: 'nitter.poast.org' },
+        { handle: 'NOELreports', name: 'NOEL Reports', nitter: 'nitter.poast.org' },
+      ],
+      // OPTIONAL: Deploy cloudflare-worker.js and set your URL here for more reliable feeds
+      // TWITTER_WORKER: 'https://your-worker.your-subdomain.workers.dev/feed',
+      TWITTER_WORKER: null, // Set to your worker URL to enable
     };
+
+    // ==================== TWITTER/X FEED HELPER ====================
+    // Extract location from tweet text
+    function extractLocationFromTweet(text) {
+      const lowerText = text.toLowerCase();
+      for (const [keyword, loc] of Object.entries(LOCATIONS)) {
+        if (lowerText.includes(keyword.toLowerCase())) {
+          return loc;
+        }
+      }
+      // Default to Ukraine for war-related content
+      if (lowerText.includes('front') || lowerText.includes('strike') || lowerText.includes('attack')) {
+        return LOCATIONS['ukraine'];
+      }
+      return null;
+    }
+
+    // Fetch Twitter feed via Nitter RSS
+    async function fetchTwitterFeed(feedConfig) {
+      try {
+        const rssUrl = `https://${feedConfig.nitter}/${feedConfig.handle}/rss`;
+        const apiUrl = `${CONFIG.RSS2JSON_API}?rss_url=${encodeURIComponent(rssUrl)}`;
+        
+        const res = await fetch(apiUrl);
+        if (!res.ok) throw new Error('RSS fetch failed');
+        
+        const data = await res.json();
+        if (data.status !== 'ok' || !data.items) return [];
+        
+        return data.items.slice(0, 5).map((item, idx) => {
+          // Clean up tweet text (remove URLs, extra whitespace)
+          let text = item.title || item.description || '';
+          text = text.replace(/https?:\/\/\S+/g, '').trim();
+          text = text.replace(/\s+/g, ' ').substring(0, 200);
+          
+          // Calculate time ago
+          const pubDate = new Date(item.pubDate);
+          const now = new Date();
+          const diffMs = now - pubDate;
+          const diffMins = Math.floor(diffMs / 60000);
+          const diffHours = Math.floor(diffMins / 60);
+          const timeAgo = diffHours > 0 ? `${diffHours}h ago` : `${diffMins}m ago`;
+          
+          // Get location
+          const loc = extractLocationFromTweet(text);
+          
+          return {
+            id: `${feedConfig.handle}-${idx}-${Date.now()}`,
+            source: `@${feedConfig.handle}`,
+            sourceName: feedConfig.name,
+            text: text,
+            time: timeAgo,
+            timestamp: pubDate,
+            link: item.link,
+            lat: loc?.lat || (Math.random() * 60 - 30),
+            lng: loc?.lng || (Math.random() * 100 - 50),
+            location: loc?.country || 'Unknown',
+          };
+        });
+      } catch (err) {
+        console.log(`Failed to fetch @${feedConfig.handle}:`, err.message);
+        return [];
+      }
+    }
+
+    // Fetch all OSINT feeds
+    async function fetchAllOsintFeeds() {
+      const allFeeds = await Promise.all(
+        CONFIG.OSINT_FEEDS.map(feed => fetchTwitterFeed(feed))
+      );
+      
+      // Flatten, sort by timestamp, take most recent 15
+      const combined = allFeeds
+        .flat()
+        .filter(item => item.text.length > 20)
+        .sort((a, b) => b.timestamp - a.timestamp)
+        .slice(0, 15);
+      
+      return combined;
+    }
 
     // ==================== LOCATION DATABASE ====================
     const LOCATIONS = {
@@ -964,6 +1059,60 @@
       const [countries, setCountries] = useState({ features: [] });
       const [isOnline, setIsOnline] = useState(true);
       const [lastUpdate, setLastUpdate] = useState(new Date());
+      const [feedLoading, setFeedLoading] = useState(false);
+
+      // Fetch Twitter/X OSINT feeds
+      const refreshOsintFeed = async () => {
+        setFeedLoading(true);
+        try {
+          let liveFeed = [];
+          
+          // Option 1: Try Cloudflare Worker if configured
+          if (CONFIG.TWITTER_WORKER) {
+            try {
+              const res = await fetch(CONFIG.TWITTER_WORKER);
+              const data = await res.json();
+              if (data.status === 'ok' && data.items) {
+                liveFeed = data.items;
+              }
+            } catch (e) {
+              console.log('Worker unavailable, falling back to RSS...');
+            }
+          }
+          
+          // Option 2: Fallback to Nitter RSS
+          if (liveFeed.length === 0) {
+            liveFeed = await fetchAllOsintFeeds();
+          }
+          
+          if (liveFeed.length > 0) {
+            setNews(liveFeed);
+            setLastUpdate(new Date());
+            setIsOnline(true);
+          }
+        } catch (err) {
+          console.error('OSINT feed error:', err);
+        }
+        setFeedLoading(false);
+      };
+
+      // Auto-fetch feeds on mount and every 2 minutes
+      useEffect(() => {
+        // Initial fetch after 1 second
+        const initialTimer = setTimeout(() => {
+          refreshOsintFeed();
+        }, 1000);
+        
+        // Refresh every 2 minutes
+        const refreshInterval = setInterval(() => {
+          refreshOsintFeed();
+        }, 120000);
+        
+        return () => {
+          clearTimeout(initialTimer);
+          clearInterval(refreshInterval);
+        };
+      }, []);
 
       // Globe texture URLs
       const GLOBE_TEXTURES = {
@@ -1211,8 +1360,11 @@
               <div className="stat-value green">${totalVolume}M</div>
             </div>
             <div className="stat-card">
-              <div className="stat-label">OSINT Events</div>
-              <div className="stat-value blue">{news.length}</div>
+              <div className="stat-label">X/OSINT Feed</div>
+              <div className="stat-value blue" style={{display: 'flex', alignItems: 'center', gap: '6px'}}>
+                {news.length > 0 && <span style={{width: '6px', height: '6px', background: '#ef4444', borderRadius: '50%', animation: 'pulse 2s infinite'}}></span>}
+                {news.length}
+              </div>
             </div>
           </div>
 
@@ -1340,20 +1492,42 @@
             {/* News Feed */}
             <div className="panel-section">
               <div className="panel-header">
-                <span className="panel-title">🔴 Live OSINT Feed</span>
-                <span className="panel-badge">{news.length}</span>
+                <span className="panel-title">
+                  <span style={{color: '#ef4444'}}>●</span> Live X/OSINT Feed
+                </span>
+                <button 
+                  className="btn" 
+                  style={{padding: '4px 8px', fontSize: '10px', background: feedLoading ? 'rgba(59,130,246,0.2)' : 'rgba(239,68,68,0.15)', color: feedLoading ? '#60a5fa' : '#f87171', border: '1px solid rgba(239,68,68,0.3)'}}
+                  onClick={refreshOsintFeed}
+                  disabled={feedLoading}
+                >
+                  {feedLoading ? '↻ Loading...' : '↻ Refresh'}
+                </button>
               </div>
               <div className="panel-content" style={{maxHeight: '200px'}}>
-                {news.slice(0, 6).map(n => (
-                  <div key={n.id} className="news-item">
-                    <div className="news-item-header">
-                      <span className="news-source">{n.source}</span>
-                      <span className="news-time">{n.time}</span>
-                    </div>
-                    <div className="news-text">{n.text}</div>
-                    <div className="news-location">📍 {n.location}</div>
+                {news.length === 0 ? (
+                  <div style={{padding: '20px', textAlign: 'center', color: '#6b7280', fontSize: '12px'}}>
+                    {feedLoading ? 'Fetching live feeds...' : 'No feed data. Click refresh to load.'}
                   </div>
-                ))}
+                ) : (
+                  news.slice(0, 6).map(n => (
+                    <a 
+                      key={n.id} 
+                      className="news-item" 
+                      href={n.link} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      style={{display: 'block', textDecoration: 'none', cursor: 'pointer'}}
+                    >
+                      <div className="news-item-header">
+                        <span className="news-source">{n.source}</span>
+                        <span className="news-time">{n.time}</span>
+                      </div>
+                      <div className="news-text">{n.text}</div>
+                      <div className="news-location">📍 {n.location}</div>
+                    </a>
+                  ))
+                )}
               </div>
             </div>
           </div>
