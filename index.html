@@ -626,8 +626,9 @@
     const CONFIG = {
       POLYMARKET_API: 'https://gamma-api.polymarket.com',
       CORS_PROXY: 'https://corsproxy.io/?',
-      REFRESH_INTERVAL: 60000, // 1 minute
-      COUNTRIES_GEOJSON: 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson',
+      REFRESH_INTERVAL: 60000,
+      // Smaller simplified borders (~500KB vs ~23MB)
+      COUNTRIES_GEOJSON: 'https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson',
     };
 
     // ==================== LOCATION DATABASE ====================
@@ -955,7 +956,6 @@
       const [news, setNews] = useState(SAMPLE_NEWS);
       const [selected, setSelected] = useState(null);
       const [loading, setLoading] = useState(true);
-      const [loadingStatus, setLoadingStatus] = useState('Initializing...');
       const [search, setSearch] = useState('');
       const [showOSINT, setShowOSINT] = useState(true);
       const [showBorders, setShowBorders] = useState(true);
@@ -965,73 +965,26 @@
       const [isOnline, setIsOnline] = useState(true);
       const [lastUpdate, setLastUpdate] = useState(new Date());
 
-      // Globe texture URLs with multiple fallbacks
+      // Globe texture URLs
       const GLOBE_TEXTURES = {
         earth: 'https://unpkg.com/three-globe@2.31.1/example/img/earth-blue-marble.jpg',
-        earthAlt: 'https://raw.githubusercontent.com/vasturiano/three-globe/master/example/img/earth-blue-marble.jpg',
-        earthAlt2: 'https://cdn.jsdelivr.net/npm/three-globe@2.31.1/example/img/earth-blue-marble.jpg',
         bump: 'https://unpkg.com/three-globe@2.31.1/example/img/earth-topology.png',
         sky: 'https://unpkg.com/three-globe@2.31.1/example/img/night-sky.png',
-        skyAlt: 'https://cdn.jsdelivr.net/npm/three-globe@2.31.1/example/img/night-sky.png',
       };
 
-      const [globeReady, setGlobeReady] = useState(false);
-      const [earthTexture, setEarthTexture] = useState(GLOBE_TEXTURES.earth);
-
-      // Preload textures with fallback chain
+      // Load country borders lazily (after initial render)
       useEffect(() => {
-        setLoadingStatus('Loading globe textures...');
-        const textureSources = [
-          GLOBE_TEXTURES.earth,
-          GLOBE_TEXTURES.earthAlt,
-          GLOBE_TEXTURES.earthAlt2,
-        ];
-        
-        let currentIndex = 0;
-        
-        const tryLoadTexture = () => {
-          if (currentIndex >= textureSources.length) {
-            // All failed, continue without texture
-            console.log('All texture sources failed, continuing...');
-            setGlobeReady(true);
-            setLoadingStatus('Ready (limited textures)');
-            return;
-          }
-          
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            setEarthTexture(textureSources[currentIndex]);
-            setGlobeReady(true);
-            setLoadingStatus('Textures loaded!');
-          };
-          img.onerror = () => {
-            console.log(`Texture source ${currentIndex + 1} failed, trying next...`);
-            currentIndex++;
-            tryLoadTexture();
-          };
-          img.src = textureSources[currentIndex];
-        };
-        
-        tryLoadTexture();
+        // Delay border loading to not block initial render
+        const timer = setTimeout(() => {
+          fetch(CONFIG.COUNTRIES_GEOJSON)
+            .then(res => res.json())
+            .then(data => setCountries(data))
+            .catch(err => console.log('Borders unavailable:', err));
+        }, 2000);
+        return () => clearTimeout(timer);
       }, []);
 
-      // Load country borders
-      useEffect(() => {
-        setLoadingStatus('Loading map borders...');
-        fetch(CONFIG.COUNTRIES_GEOJSON)
-          .then(res => res.json())
-          .then(data => {
-            setCountries(data);
-            setLoadingStatus('Processing markets...');
-          })
-          .catch(err => {
-            console.log('Could not load borders:', err);
-            setLoadingStatus('Processing markets...');
-          });
-      }, []);
-
-      // Process markets
+      // Process markets immediately
       useEffect(() => {
         const processed = SAMPLE_MARKETS
           .map(m => {
@@ -1050,12 +1003,9 @@
           })
           .filter(Boolean);
         
-        setTimeout(() => {
-          setMarkets(processed);
-          setLoadingStatus('Ready!');
-          // Small delay to ensure everything is ready
-          setTimeout(() => setLoading(false), 500);
-        }, 1500);
+        setMarkets(processed);
+        // Quick fade out of loading screen
+        setTimeout(() => setLoading(false), 300);
       }, []);
 
       // Globe setup
@@ -1196,11 +1146,8 @@
         return (
           <div className="loading">
             <div className="loading-icon">⚡</div>
-            <h2>Loading ConnecTHOR...</h2>
-            <p>{loadingStatus}</p>
-            <div className="loading-progress">
-              <div className="loading-bar"></div>
-            </div>
+            <h2>ConnecTHOR</h2>
+            <p>Loading markets...</p>
           </div>
         );
       }
@@ -1272,10 +1219,9 @@
           {/* Globe */}
           <Globe
             ref={globeEl}
-            globeImageUrl={earthTexture}
+            globeImageUrl={GLOBE_TEXTURES.earth}
             bumpImageUrl={GLOBE_TEXTURES.bump}
             backgroundImageUrl={GLOBE_TEXTURES.sky}
-            waitForGlobeReady={true}
             animateIn={true}
             
             // Country borders
