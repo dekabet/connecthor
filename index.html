@@ -209,6 +209,79 @@
     .stat-value.green { color: var(--accent-green); }
     .stat-value.blue { color: var(--accent-blue); }
     
+    /* Spotlight Banner */
+    .spotlight-banner {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: 50px;
+      padding: 10px 24px;
+      animation: spotlightFadeIn 0.5s ease-out;
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.3), 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+    
+    @keyframes spotlightFadeIn {
+      0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    
+    .spotlight-pulse {
+      position: absolute;
+      left: 12px;
+      width: 8px;
+      height: 8px;
+      background: #3b82f6;
+      border-radius: 50%;
+      animation: spotlightPulse 1s infinite;
+    }
+    
+    @keyframes spotlightPulse {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
+      50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
+    }
+    
+    .spotlight-icon {
+      font-size: 18px;
+      margin-left: 8px;
+    }
+    
+    .spotlight-label {
+      font-size: 10px;
+      font-weight: 700;
+      color: #60a5fa;
+      letter-spacing: 1px;
+    }
+    
+    .spotlight-text {
+      font-size: 13px;
+      color: white;
+      max-width: 400px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .spotlight-prob {
+      font-size: 18px;
+      font-weight: 700;
+      margin-left: 8px;
+    }
+    
+    .spotlight-banner:hover {
+      border-color: rgba(59, 130, 246, 0.6);
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.4), 0 8px 32px rgba(0, 0, 0, 0.4);
+      transform: translateX(-50%) scale(1.02);
+      transition: all 0.2s ease;
+    }
+    
     /* Loading */
     .loading {
       position: absolute;
@@ -1290,6 +1363,112 @@
       'crypto': { lat: 37.77, lng: -122.42, country: 'Global', region: 'Americas' },
     };
 
+    // ==================== LIVE ANIMATION GENERATORS ====================
+    
+    // Generate animated arcs from DC to major markets
+    function generateTradeArcs(markets) {
+      const dcLat = 38.9, dcLng = -77;
+      const highVolumeMarkets = markets
+        .filter(m => parseFloat(m.volume) > 1000000 && m.lat && m.lng)
+        .filter(m => Math.abs(m.lat - dcLat) > 5 || Math.abs(m.lng - dcLng) > 10) // Not too close to DC
+        .slice(0, 15);
+      
+      return highVolumeMarkets.map((m, i) => ({
+        startLat: dcLat,
+        startLng: dcLng,
+        endLat: m.lat,
+        endLng: m.lng,
+        color: m.category === 'Conflict' ? ['rgba(239, 68, 68, 0.8)', 'rgba(249, 115, 22, 0.4)'] : 
+               m.category === 'Trump' ? ['rgba(239, 68, 68, 0.9)', 'rgba(239, 68, 68, 0.3)'] :
+               m.category === 'Economy' ? ['rgba(34, 197, 94, 0.8)', 'rgba(16, 185, 129, 0.4)'] :
+               ['rgba(59, 130, 246, 0.8)', 'rgba(139, 92, 246, 0.4)'],
+        stroke: Math.min(2.5, 0.8 + parseFloat(m.volume) / 50000000),
+        dashLength: 0.4,
+        dashGap: 0.2,
+        dashAnimateTime: 1500 + (i % 5) * 300,
+        altitude: 0.15 + (i % 3) * 0.08,
+        label: m.question?.substring(0, 20),
+      }));
+    }
+    
+    // Generate pulsing rings around high-activity markets  
+    function generatePulseRings(markets) {
+      return markets
+        .filter(m => (parseFloat(m.volume) > 3000000 || m.category === 'Trump') && m.lat && m.lng)
+        .slice(0, 20)
+        .map((m, i) => ({
+          lat: m.lat,
+          lng: m.lng,
+          maxR: m.category === 'Trump' ? 4 : 2.5,
+          propagationSpeed: 1.5 + (i % 3) * 0.5,
+          repeatPeriod: 1200 + (i % 4) * 400,
+          color: m.category === 'Trump' ? 'rgba(239, 68, 68, 0.6)' : 
+                 m.yesPrice > 0.7 ? 'rgba(34, 197, 94, 0.5)' :
+                 m.yesPrice < 0.3 ? 'rgba(239, 68, 68, 0.5)' : 'rgba(245, 158, 11, 0.5)',
+          altitude: 0.005,
+        }));
+    }
+    
+    // Generate "satellite" points orbiting hotspots
+    function generateOrbitalPoints(markets) {
+      const hotspots = markets
+        .filter(m => parseFloat(m.volume) > 10000000)
+        .slice(0, 5);
+      
+      const orbitals = [];
+      hotspots.forEach((m, hi) => {
+        for (let i = 0; i < 3; i++) {
+          const angle = (i / 3) * Math.PI * 2 + (hi * 0.5);
+          const radius = 3 + i;
+          orbitals.push({
+            centerLat: m.lat,
+            centerLng: m.lng,
+            angle: angle,
+            radius: radius,
+            speed: 0.02 + i * 0.01,
+            color: m.category === 'Trump' ? '#ef4444' : '#3b82f6',
+            size: 0.3,
+          });
+        }
+      });
+      return orbitals;
+    }
+    
+    // Generate connection lines between related markets
+    function generateMarketConnections(markets) {
+      const connections = [];
+      const trumpMarkets = markets.filter(m => m.category === 'Trump' && m.lat && m.lng).slice(0, 8);
+      const conflictMarkets = markets.filter(m => m.category === 'Conflict' && m.lat && m.lng).slice(0, 5);
+      
+      // Connect Trump markets to each other (web effect)
+      for (let i = 0; i < trumpMarkets.length; i++) {
+        for (let j = i + 1; j < Math.min(i + 3, trumpMarkets.length); j++) {
+          connections.push({
+            startLat: trumpMarkets[i].lat,
+            startLng: trumpMarkets[i].lng,
+            endLat: trumpMarkets[j].lat,
+            endLng: trumpMarkets[j].lng,
+            color: 'rgba(239, 68, 68, 0.15)',
+            stroke: 0.5,
+          });
+        }
+      }
+      
+      // Connect conflict markets
+      for (let i = 0; i < conflictMarkets.length - 1; i++) {
+        connections.push({
+          startLat: conflictMarkets[i].lat,
+          startLng: conflictMarkets[i].lng,
+          endLat: conflictMarkets[i + 1].lat,
+          endLng: conflictMarkets[i + 1].lng,
+          color: 'rgba(249, 115, 22, 0.2)',
+          stroke: 0.4,
+        });
+      }
+      
+      return connections;
+    }
+
     // ==================== SAMPLE MARKETS DATA (Trump prioritized, then others) ====================
     
     // TRUMP MARKETS (Prioritized - from polymarket.com/politics/trump) - Updated Jan 19, 2026
@@ -1490,12 +1669,41 @@
       const [search, setSearch] = useState('');
       const [showOSINT, setShowOSINT] = useState(true);
       const [showBorders, setShowBorders] = useState(true);
+      const [showHexDensity, setShowHexDensity] = useState(true);
       const [liveLoading, setLiveLoading] = useState(false);
       const [category, setCategory] = useState('Trump');
       const [countries, setCountries] = useState({ features: [] });
       const [isOnline, setIsOnline] = useState(false);
       const [lastUpdate, setLastUpdate] = useState(new Date());
       const [dataSource, setDataSource] = useState('sample'); // 'sample' or 'live'
+      const [highlightedMarket, setHighlightedMarket] = useState(null);
+      const [animationTick, setAnimationTick] = useState(0);
+
+      // Periodic market highlight animation
+      useEffect(() => {
+        const highlightInterval = setInterval(() => {
+          if (markets.length > 0) {
+            // Pick a random high-volume market to highlight
+            const candidates = markets.filter(m => parseFloat(m.volume) > 1000000);
+            if (candidates.length > 0) {
+              const randomMarket = candidates[Math.floor(Math.random() * candidates.length)];
+              setHighlightedMarket(randomMarket);
+              // Clear highlight after 3 seconds
+              setTimeout(() => setHighlightedMarket(null), 3000);
+            }
+          }
+        }, 8000); // Every 8 seconds
+        
+        return () => clearInterval(highlightInterval);
+      }, [markets]);
+      
+      // Animation tick for smooth updates
+      useEffect(() => {
+        const animInterval = setInterval(() => {
+          setAnimationTick(t => (t + 1) % 1000);
+        }, 100);
+        return () => clearInterval(animInterval);
+      }, []);
 
       // Process markets (either sample or live)
       const processMarkets = (rawMarkets) => {
@@ -1693,6 +1901,18 @@
           globeEl.current.pointOfView({ lat: selected.lat, lng: selected.lng, altitude: 1.5 }, 800);
         }
       }, [selected]);
+      
+      // Gently pan towards highlighted market
+      useEffect(() => {
+        if (globeEl.current && highlightedMarket && !selected) {
+          // Only pan if user hasn't manually selected something
+          globeEl.current.pointOfView({ 
+            lat: highlightedMarket.lat, 
+            lng: highlightedMarket.lng, 
+            altitude: 2.2 
+          }, 2000);
+        }
+      }, [highlightedMarket, selected]);
 
       // Categories - Trump first
       const categories = useMemo(() => {
@@ -1782,6 +2002,14 @@
                   onClick={() => setShowBorders(!showBorders)}
                 >
                   🗺️ Borders
+                </button>
+                
+                <button
+                  className={`btn ${!showHexDensity ? 'inactive' : ''}`}
+                  onClick={() => setShowHexDensity(!showHexDensity)}
+                  style={{background: showHexDensity ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)', color: showHexDensity ? '#a78bfa' : 'var(--text-muted)', borderColor: showHexDensity ? 'rgba(139, 92, 246, 0.3)' : 'var(--border)'}}
+                >
+                  🔷 Density
                 </button>
                 
                 <button
@@ -1901,6 +2129,27 @@
             </div>
           </div>
 
+          {/* Market Spotlight Banner */}
+          {highlightedMarket && (
+            <div 
+              className="spotlight-banner"
+              onClick={() => setSelected(highlightedMarket)}
+              style={{cursor: 'pointer'}}
+              title="Click to view market details"
+            >
+              <div className="spotlight-pulse"></div>
+              <span className="spotlight-icon">⚡</span>
+              <span className="spotlight-label">SPOTLIGHT</span>
+              <span className="spotlight-text">
+                {highlightedMarket.question?.substring(0, 50)}...
+              </span>
+              <span className="spotlight-prob" style={{color: highlightedMarket.yesPrice > 0.6 ? '#22c55e' : highlightedMarket.yesPrice < 0.4 ? '#ef4444' : '#f59e0b'}}>
+                {highlightedMarket.probability}
+              </span>
+              <span style={{marginLeft: '12px', fontSize: '12px', color: '#60a5fa'}}>Click to view →</span>
+            </div>
+          )}
+
           {/* Globe */}
           <Globe
             ref={globeEl}
@@ -1916,13 +2165,41 @@
             polygonStrokeColor={() => 'rgba(100, 180, 255, 0.35)'}
             polygonAltitude={0.005}
             
+            // Hex bin density visualization
+            hexBinPointsData={showHexDensity ? filtered : []}
+            hexBinPointLat="lat"
+            hexBinPointLng="lng"
+            hexBinPointWeight={d => Math.log10(Math.max(parseFloat(d.volume) || 1, 1))}
+            hexBinResolution={3}
+            hexAltitude={d => Math.min(d.sumWeight * 0.003, 0.15)}
+            hexTopColor={d => {
+              const intensity = Math.min(d.sumWeight / 25, 1);
+              return `rgba(139, 92, 246, ${0.1 + intensity * 0.4})`;
+            }}
+            hexSideColor={d => {
+              const intensity = Math.min(d.sumWeight / 25, 1);
+              return `rgba(59, 130, 246, ${0.1 + intensity * 0.3})`;
+            }}
+            hexBinMerge={true}
+            
             // Market points
             pointsData={filtered}
             pointLat="lat"
             pointLng="lng"
             pointAltitude={getAltitude}
             pointColor={getColor}
-            pointRadius={0.4}
+            pointRadius={d => {
+              const baseRadius = 0.4;
+              // Pulse effect for highlighted market
+              if (highlightedMarket && d.id === highlightedMarket.id) {
+                return baseRadius + 0.3 * Math.sin(animationTick * 0.3);
+              }
+              // Slightly larger for selected market
+              if (selected && d.id === selected.id) {
+                return baseRadius + 0.2;
+              }
+              return baseRadius;
+            }}
             pointLabel={d => `
               <div style="background:rgba(10,15,26,0.95);padding:14px 18px;border-radius:12px;border:1px solid ${d.category === 'Trump' ? 'rgba(220,38,38,0.4)' : 'rgba(59,130,246,0.3)'};max-width:300px;backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.4);">
                 <div style="font-size:10px;color:${d.category === 'Trump' ? '#f87171' : '#60a5fa'};font-weight:600;margin-bottom:4px;">${d.category === 'Trump' ? '🇺🇸 Trump' : '📍 ' + d.country} • ${d.category || 'Politics'}</div>
@@ -1964,20 +2241,54 @@
             
             // Atmosphere
             atmosphereColor="#3b82f6"
-            atmosphereAltitude={0.1}
+            atmosphereAltitude={0.12}
             
-            // Connection arcs for high-volume markets
-            arcsData={filtered.filter(m => parseFloat(m.volume) > 2e6).slice(0, 6)}
-            arcStartLat={() => 38.9}
-            arcStartLng={() => -77}
-            arcEndLat="lat"
-            arcEndLng="lng"
-            arcColor={() => ['rgba(139,92,246,0.5)', 'rgba(139,92,246,0.1)']}
-            arcAltitude={0.2}
-            arcStroke={0.3}
-            arcDashLength={0.3}
-            arcDashGap={0.1}
-            arcDashAnimateTime={3000}
+            // Animated connection arcs
+            arcsData={useMemo(() => generateTradeArcs(filtered), [filtered])}
+            arcStartLat="startLat"
+            arcStartLng="startLng"
+            arcEndLat="endLat"
+            arcEndLng="endLng"
+            arcColor="color"
+            arcAltitude="altitude"
+            arcStroke="stroke"
+            arcDashLength="dashLength"
+            arcDashGap="dashGap"
+            arcDashAnimateTime="dashAnimateTime"
+            
+            // Pulsing rings around high-volume markets + highlight ring
+            ringsData={useMemo(() => {
+              const baseRings = generatePulseRings(filtered);
+              // Add special highlight ring
+              if (highlightedMarket) {
+                baseRings.unshift({
+                  lat: highlightedMarket.lat,
+                  lng: highlightedMarket.lng,
+                  maxR: 6,
+                  propagationSpeed: 4,
+                  repeatPeriod: 800,
+                  color: 'rgba(255, 255, 255, 0.8)',
+                  altitude: 0.02,
+                });
+              }
+              return baseRings;
+            }, [filtered, highlightedMarket])}
+            ringLat="lat"
+            ringLng="lng"
+            ringMaxRadius="maxR"
+            ringPropagationSpeed="propagationSpeed"
+            ringRepeatPeriod="repeatPeriod"
+            ringColor="color"
+            ringAltitude="altitude"
+            
+            // Static connection lines between related markets
+            pathsData={useMemo(() => generateMarketConnections(filtered), [filtered])}
+            pathPoints={d => [[d.startLat, d.startLng], [d.endLat, d.endLng]]}
+            pathColor="color"
+            pathStroke="stroke"
+            pathDashLength={0.01}
+            pathDashGap={0.02}
+            pathDashAnimateTime={0}
           />
 
           {/* Markets Panel */}
