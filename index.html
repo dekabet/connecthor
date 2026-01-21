@@ -3,290 +3,753 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ConnecTHOR - Real-Time Geopolitical Market Intelligence</title>
-  <meta name="description" content="Real-time visualization of geopolitical prediction markets on an interactive 3D globe with live data">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
-  
+  <title>ConnecTHOR v2.0 - Real-Time Geopolitical Intelligence</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script src="https://unpkg.com/react-globe.gl@2.27.2"></script>
-    <script async src="https://platform.twitter.com/widgets.js" charset="utf-8"></script>
-  
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    
     :root {
       --bg-primary: #0a0f1a;
-      --bg-secondary: #111827;
-      --bg-card: rgba(17, 24, 39, 0.95);
-      --border: #1f2937;
-      --border-light: #374151;
-      --text-primary: #ffffff;
-      --text-secondary: #9ca3af;
-      --text-muted: #6b7280;
+      --bg-secondary: rgba(15, 23, 42, 0.9);
+      --bg-card: rgba(15, 23, 42, 0.85);
+      --bg-hover: rgba(30, 41, 59, 0.8);
+      --border: rgba(71, 85, 105, 0.4);
+      --text-primary: #f1f5f9;
+      --text-muted: #94a3b8;
       --accent-blue: #3b82f6;
-      --accent-green: #22c55e;
-      --accent-yellow: #eab308;
-      --accent-red: #ef4444;
       --accent-purple: #8b5cf6;
+      --accent-green: #22c55e;
+      --accent-red: #ef4444;
+      --accent-yellow: #eab308;
+      --accent-orange: #f97316;
     }
     
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-family: 'Inter', -apple-system, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
       overflow: hidden;
+      height: 100vh;
     }
     
-    #root { 
-      width: 100vw; 
-      height: 100vh; 
-      background: radial-gradient(ellipse at center, #1a1a3e 0%, #0a0f1a 100%);
-    }
+    #root { height: 100%; }
     
-    /* Globe canvas fallback */
-    canvas {
-      background: transparent !important;
+    /* Main Layout */
+    .app-container {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      grid-template-columns: 320px 1fr 350px;
+      grid-template-areas:
+        "header header header"
+        "left globe right"
+        "ticker ticker ticker";
+      height: 100vh;
+      gap: 0;
     }
     
     /* Header */
     .header {
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
-      background: linear-gradient(to bottom, var(--bg-primary) 0%, rgba(10,15,26,0.9) 70%, transparent 100%);
-      padding: 12px 20px;
-    }
-    
-    .header-content {
+      grid-area: header;
+      background: linear-gradient(to bottom, var(--bg-primary), rgba(10,15,26,0.95));
+      border-bottom: 1px solid var(--border);
+      padding: 10px 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      max-width: 1600px;
-      margin: 0 auto;
+      z-index: 100;
     }
     
     .logo {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 12px;
     }
     
     .logo-icon {
-      font-size: 26px;
-      filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+      font-size: 28px;
+      filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.6));
+      animation: logoPulse 3s infinite;
+    }
+    
+    @keyframes logoPulse {
+      0%, 100% { filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.6)); }
+      50% { filter: drop-shadow(0 0 20px rgba(139, 92, 246, 0.8)); }
     }
     
     .logo h1 {
-      font-size: 18px;
-      font-weight: 700;
-      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      font-size: 20px;
+      font-weight: 800;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6, #ec4899);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       letter-spacing: -0.5px;
     }
     
-    .logo p { font-size: 10px; color: var(--text-muted); }
-    
-    .controls {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .logo-version {
+      font-size: 10px;
+      color: var(--accent-purple);
+      background: rgba(139, 92, 246, 0.15);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
     }
     
-    .search-input {
+    .header-stats {
+      display: flex;
+      gap: 20px;
+    }
+    
+    .header-stat {
+      text-align: center;
+    }
+    
+    .header-stat-value {
+      font-size: 18px;
+      font-weight: 700;
+    }
+    
+    .header-stat-value.live {
+      color: var(--accent-green);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    
+    .header-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: var(--accent-green);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5); }
+      50% { opacity: 0.8; box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+    }
+    
+    .header-controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    
+    .search-box {
       background: var(--bg-secondary);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 8px 14px;
-      color: var(--text-primary);
+      padding: 8px 12px;
+      color: white;
+      width: 200px;
       font-size: 13px;
-      width: 220px;
-      outline: none;
     }
     
-    .search-input:focus { border-color: var(--accent-blue); }
-    .search-input::placeholder { color: var(--text-muted); }
+    .search-box:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+    }
     
     .btn {
       padding: 8px 14px;
       border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg-secondary);
+      color: var(--text-primary);
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 600;
       cursor: pointer;
-      border: 1px solid transparent;
       transition: all 0.2s;
       display: flex;
       align-items: center;
       gap: 6px;
     }
     
-    .btn-osint {
-      background: rgba(239, 68, 68, 0.15);
-      color: #f87171;
-      border-color: rgba(239, 68, 68, 0.3);
+    .btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--accent-blue);
     }
     
-    .btn-osint.inactive {
-      background: var(--bg-secondary);
-      color: var(--text-muted);
-      border-color: var(--border);
+    .btn.active {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
     }
     
     .btn-live {
       background: rgba(34, 197, 94, 0.15);
-      color: #4ade80;
       border-color: rgba(34, 197, 94, 0.3);
+      color: var(--accent-green);
     }
     
-    .btn-live.active {
+    .btn-live.connected {
       background: rgba(34, 197, 94, 0.25);
-      border-color: #22c55e;
-      box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+      box-shadow: 0 0 15px rgba(34, 197, 94, 0.3);
     }
     
-    .btn-live.loading {
-      background: rgba(59, 130, 246, 0.15);
-      color: #60a5fa;
-      border-color: rgba(59, 130, 246, 0.3);
-      animation: pulseButton 1s infinite;
-    }
-    
-    @keyframes pulseButton {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
-      50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
-    }
-    
-    .btn-borders {
-      background: rgba(139, 92, 246, 0.15);
-      color: #a78bfa;
-      border-color: rgba(139, 92, 246, 0.3);
-    }
-    
-    .btn-borders.inactive {
+    /* Left Panel - Markets */
+    .left-panel {
+      grid-area: left;
       background: var(--bg-secondary);
-      color: var(--text-muted);
-      border-color: var(--border);
-    }
-    
-    .pulse-dot {
-      width: 6px; height: 6px;
-      background: currentColor;
-      border-radius: 50%;
-      opacity: 0.6;
-    }
-    
-    .pulse-dot.live {
-      background: #22c55e;
-      animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.5; transform: scale(1.3); }
-    }
-    
-    /* Stats Bar */
-    .stats-bar {
-      position: absolute;
-      top: 60px; left: 16px;
-      z-index: 50;
+      border-right: 1px solid var(--border);
       display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
       gap: 8px;
     }
     
-    .stat-card {
-      background: var(--bg-card);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
+    .panel-badge {
+      background: var(--accent-blue);
+      color: white;
+      font-size: 10px;
+      padding: 2px 8px;
       border-radius: 10px;
-      padding: 10px 14px;
+      font-weight: 600;
     }
     
-    .stat-label { font-size: 10px; color: var(--text-muted); }
-    .stat-value { font-size: 16px; font-weight: 700; }
-    .stat-value.green { color: var(--accent-green); }
-    .stat-value.blue { color: var(--accent-blue); }
+    /* Source Tabs */
+    .source-tabs {
+      display: flex;
+      padding: 8px;
+      gap: 4px;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .source-tab {
+      flex: 1;
+      padding: 6px 8px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .source-tab:hover {
+      background: var(--bg-hover);
+      color: white;
+    }
+    
+    .source-tab.active {
+      background: var(--accent-blue);
+      color: white;
+    }
+    
+    .source-tab.polymarket.active { background: #6366f1; }
+    .source-tab.manifold.active { background: #8b5cf6; }
+    .source-tab.metaculus.active { background: #06b6d4; }
+    
+    /* Category Tabs */
+    .category-tabs {
+      display: flex;
+      padding: 8px;
+      gap: 4px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .category-tab {
+      padding: 5px 10px;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .category-tab:hover {
+      background: var(--bg-hover);
+    }
+    
+    .category-tab.active {
+      background: rgba(59, 130, 246, 0.2);
+      color: var(--accent-blue);
+    }
+    
+    .category-tab.trump.active {
+      background: rgba(220, 38, 38, 0.2);
+      color: #f87171;
+    }
+    
+    /* Markets List */
+    .markets-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    
+    .market-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .market-card:hover {
+      border-color: var(--accent-blue);
+      transform: translateX(4px);
+    }
+    
+    .market-card.selected {
+      border-color: var(--accent-blue);
+      background: rgba(59, 130, 246, 0.1);
+    }
+    
+    .market-card.trump {
+      border-left: 3px solid var(--accent-red);
+    }
+    
+    .market-source {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    
+    .market-source.polymarket { color: #818cf8; }
+    .market-source.manifold { color: #a78bfa; }
+    .market-source.metaculus { color: #22d3ee; }
+    
+    .market-question {
+      font-size: 12px;
+      font-weight: 600;
+      line-height: 1.4;
+      margin-bottom: 8px;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .market-stats {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .market-prob {
+      font-size: 18px;
+      font-weight: 800;
+    }
+    
+    .market-prob.high { color: var(--accent-green); }
+    .market-prob.medium { color: var(--accent-yellow); }
+    .market-prob.low { color: var(--accent-red); }
+    
+    .market-volume {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    
+    .market-change {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+    
+    .market-change.up {
+      color: var(--accent-green);
+      background: rgba(34, 197, 94, 0.15);
+    }
+    
+    .market-change.down {
+      color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.15);
+    }
+    
+    /* Globe Area */
+    .globe-area {
+      grid-area: globe;
+      position: relative;
+      background: radial-gradient(ellipse at center, #1a1f35 0%, #0a0f1a 100%);
+      overflow: hidden;
+    }
+    
+    .globe-container {
+      width: 100%;
+      height: 100%;
+    }
     
     /* Spotlight Banner */
     .spotlight-banner {
       position: absolute;
-      bottom: 20px;
+      bottom: 80px;
       left: 50%;
       transform: translateX(-50%);
-      z-index: 100;
+      z-index: 50;
       display: flex;
       align-items: center;
       gap: 12px;
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
       backdrop-filter: blur(16px);
       border: 1px solid rgba(59, 130, 246, 0.3);
       border-radius: 50px;
-      padding: 10px 24px;
-      animation: spotlightFadeIn 0.5s ease-out;
-      box-shadow: 0 0 30px rgba(59, 130, 246, 0.3), 0 8px 32px rgba(0, 0, 0, 0.3);
+      padding: 10px 20px;
+      animation: spotlightIn 0.5s ease-out;
+      cursor: pointer;
+      transition: all 0.2s;
     }
     
-    @keyframes spotlightFadeIn {
-      0% { opacity: 0; transform: translateX(-50%) translateY(20px); }
-      100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .spotlight-banner:hover {
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
     }
     
-    .spotlight-pulse {
-      position: absolute;
-      left: 12px;
+    @keyframes spotlightIn {
+      from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+      to { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+    
+    .spotlight-dot {
       width: 8px;
       height: 8px;
-      background: #3b82f6;
+      background: var(--accent-blue);
       border-radius: 50%;
-      animation: spotlightPulse 1s infinite;
-    }
-    
-    @keyframes spotlightPulse {
-      0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6); }
-      50% { box-shadow: 0 0 0 8px rgba(59, 130, 246, 0); }
-    }
-    
-    .spotlight-icon {
-      font-size: 18px;
-      margin-left: 8px;
+      animation: pulse 1s infinite;
     }
     
     .spotlight-label {
       font-size: 10px;
       font-weight: 700;
-      color: #60a5fa;
+      color: var(--accent-blue);
       letter-spacing: 1px;
     }
     
     .spotlight-text {
       font-size: 13px;
       color: white;
-      max-width: 400px;
+      max-width: 350px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
     
     .spotlight-prob {
-      font-size: 18px;
-      font-weight: 700;
-      margin-left: 8px;
+      font-size: 16px;
+      font-weight: 800;
     }
     
-    .spotlight-banner:hover {
-      border-color: rgba(59, 130, 246, 0.6);
-      box-shadow: 0 0 40px rgba(59, 130, 246, 0.4), 0 8px 32px rgba(0, 0, 0, 0.4);
-      transform: translateX(-50%) scale(1.02);
-      transition: all 0.2s ease;
+    /* Selected Market Detail */
+    .market-detail {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 60;
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 24px;
+      min-width: 400px;
+      max-width: 500px;
+    }
+    
+    .market-detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+    }
+    
+    .market-detail-close {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 18px;
+    }
+    
+    .market-detail-question {
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.4;
+      flex: 1;
+      margin-right: 12px;
+    }
+    
+    .market-detail-stats {
+      display: flex;
+      gap: 24px;
+    }
+    
+    .market-detail-stat {
+      text-align: center;
+    }
+    
+    .market-detail-stat-value {
+      font-size: 24px;
+      font-weight: 800;
+    }
+    
+    .market-detail-stat-label {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+    }
+    
+    .market-detail-link {
+      display: inline-block;
+      margin-top: 12px;
+      color: var(--accent-blue);
+      font-size: 12px;
+      text-decoration: none;
+    }
+    
+    .market-detail-link:hover {
+      text-decoration: underline;
+    }
+    
+    /* Right Panel - Activity */
+    .right-panel {
+      grid-area: right;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    
+    /* Activity Tabs */
+    .activity-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    .activity-tab {
+      flex: 1;
+      padding: 12px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-bottom: 2px solid transparent;
+    }
+    
+    .activity-tab:hover {
+      color: white;
+      background: var(--bg-hover);
+    }
+    
+    .activity-tab.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+    
+    /* Activity Feed */
+    .activity-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    
+    .activity-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    
+    .activity-item.whale {
+      border-color: var(--accent-yellow);
+      background: rgba(234, 179, 8, 0.1);
+    }
+    
+    .activity-icon {
+      font-size: 16px;
+    }
+    
+    .activity-content {
+      flex: 1;
+      min-width: 0;
+    }
+    
+    .activity-title {
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    
+    .activity-meta {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      gap: 8px;
+    }
+    
+    .activity-amount {
+      font-size: 12px;
+      font-weight: 700;
+    }
+    
+    .activity-amount.buy { color: var(--accent-green); }
+    .activity-amount.sell { color: var(--accent-red); }
+    
+    .activity-time {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+    
+    /* News Feed */
+    .news-feed {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+    }
+    
+    .news-item {
+      padding: 10px;
+      border-radius: 8px;
+      margin-bottom: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .news-item:hover {
+      border-color: var(--accent-blue);
+    }
+    
+    .news-item.breaking {
+      border-left: 3px solid var(--accent-red);
+      animation: newsFlash 2s ease-out;
+    }
+    
+    @keyframes newsFlash {
+      0% { background: rgba(239, 68, 68, 0.2); }
+      100% { background: var(--bg-card); }
+    }
+    
+    .news-source {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--accent-blue);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    
+    .news-title {
+      font-size: 12px;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    
+    .news-time {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+    
+    /* News Ticker */
+    .news-ticker {
+      grid-area: ticker;
+      background: linear-gradient(90deg, rgba(220, 38, 38, 0.2), rgba(239, 68, 68, 0.1), rgba(220, 38, 38, 0.2));
+      border-top: 1px solid rgba(239, 68, 68, 0.3);
+      padding: 8px 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+    }
+    
+    .ticker-label {
+      background: var(--accent-red);
+      color: white;
+      padding: 4px 12px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-right: 16px;
+      flex-shrink: 0;
+      animation: tickerPulse 2s infinite;
+    }
+    
+    @keyframes tickerPulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    
+    .ticker-content {
+      display: flex;
+      animation: tickerScroll 60s linear infinite;
+      white-space: nowrap;
+    }
+    
+    @keyframes tickerScroll {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+    
+    .ticker-item {
+      padding: 0 40px;
+      font-size: 12px;
+      color: var(--text-primary);
+    }
+    
+    .ticker-item::after {
+      content: '•';
+      margin-left: 40px;
+      color: var(--accent-red);
     }
     
     /* Loading */
-    .loading {
-      position: absolute;
+    .loading-screen {
+      position: fixed;
       inset: 0;
-      z-index: 200;
+      z-index: 1000;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -295,2181 +758,902 @@
     }
     
     .loading-icon {
-      font-size: 48px;
-      animation: pulse 1.5s infinite;
-      filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.5));
+      font-size: 64px;
+      animation: loadingBounce 1s infinite;
     }
     
-    .loading h2 { margin-top: 16px; font-size: 18px; }
-    .loading p { color: var(--text-muted); font-size: 12px; margin-top: 6px; }
+    @keyframes loadingBounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
     
-    .loading-progress {
-      width: 200px;
-      height: 3px;
-      background: var(--border);
-      border-radius: 2px;
-      margin-top: 20px;
-      overflow: hidden;
+    .loading-text {
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--text-muted);
     }
     
     .loading-bar {
-      height: 100%;
-      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
-      animation: loading 2s ease-in-out infinite;
-    }
-    
-    @keyframes loading {
-      0% { width: 0%; margin-left: 0; }
-      50% { width: 60%; margin-left: 20%; }
-      100% { width: 0%; margin-left: 100%; }
-    }
-    
-    /* Markets Panel */
-    .markets-panel {
-      position: absolute;
-      top: 60px; right: 16px;
-      width: 360px;
-      max-height: calc(100vh - 80px);
-      z-index: 50;
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-    
-    .panel-section {
-      background: var(--bg-card);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      width: 200px;
+      height: 3px;
+      background: var(--bg-secondary);
+      border-radius: 2px;
+      margin-top: 16px;
       overflow: hidden;
     }
     
-    .panel-header {
-      padding: 12px 14px;
-      border-bottom: 1px solid var(--border);
+    .loading-progress {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+      animation: loadingProgress 2s ease-out forwards;
+    }
+    
+    @keyframes loadingProgress {
+      0% { width: 0; }
+      100% { width: 100%; }
+    }
+    
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+    
+    /* Connection Status */
+    .connection-status {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 50;
       display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: var(--bg-secondary);
+      gap: 8px;
     }
     
-    .panel-title {
-      font-size: 12px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    
-    .panel-badge {
-      background: var(--accent-blue);
-      color: white;
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 10px;
-    }
-    
-    .panel-content {
-      max-height: 280px;
-      overflow-y: auto;
-      padding: 6px;
-    }
-    
-    .panel-content::-webkit-scrollbar { width: 4px; }
-    .panel-content::-webkit-scrollbar-track { background: transparent; }
-    .panel-content::-webkit-scrollbar-thumb { background: var(--border-light); border-radius: 2px; }
-    
-    /* Market Items */
-    .market-item {
-      width: 100%;
-      text-align: left;
-      padding: 10px;
-      border-radius: 8px;
-      background: transparent;
-      border: 1px solid transparent;
-      cursor: pointer;
-      transition: all 0.15s;
-      margin-bottom: 2px;
-      color: var(--text-primary);
-    }
-    
-    .market-item:hover { background: rgba(59, 130, 246, 0.1); }
-    .market-item.active { background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.3); }
-    
-    .market-item-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 10px;
-    }
-    
-    .market-item-location {
-      font-size: 9px;
-      color: var(--accent-blue);
-      font-weight: 500;
-      margin-bottom: 2px;
-    }
-    
-    .market-item-title {
-      font-size: 12px;
-      line-height: 1.3;
-      color: var(--text-primary);
-    }
-    
-    .market-item-prob {
-      font-size: 14px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    
-    .market-item-prob.high { color: var(--accent-green); }
-    .market-item-prob.medium { color: var(--accent-yellow); }
-    .market-item-prob.low { color: var(--accent-red); }
-    
-    .market-item-meta {
-      font-size: 9px;
-      color: var(--text-muted);
-      text-align: right;
-    }
-    
-    /* News Feed */
-    .news-item {
-      padding: 10px;
-      border-radius: 8px;
-      margin-bottom: 2px;
-      transition: background 0.15s;
-    }
-    
-    .news-item:hover { background: rgba(239, 68, 68, 0.1); }
-    
-    .news-item-header {
+    .connection-badge {
       display: flex;
       align-items: center;
       gap: 6px;
-      margin-bottom: 4px;
-    }
-    
-    .news-source {
+      padding: 6px 12px;
+      border-radius: 20px;
       font-size: 10px;
       font-weight: 600;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+    }
+    
+    .connection-badge.connected {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+    }
+    
+    .connection-badge.error {
+      border-color: var(--accent-red);
       color: var(--accent-red);
     }
     
-    .news-time {
-      font-size: 9px;
-      color: var(--text-muted);
-    }
-    
-    .news-text {
-      font-size: 11px;
-      line-height: 1.4;
-      color: var(--text-secondary);
-    }
-    
-    .news-location {
-      font-size: 9px;
-      color: var(--accent-blue);
-      margin-top: 4px;
-    }
-    
-    /* Selected Market Detail */
-    .detail-panel {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: 420px;
-      z-index: 60;
-      background: var(--bg-card);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px;
-    }
-    
-    .detail-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 14px;
-    }
-    
-    .detail-location {
-      font-size: 11px;
-      color: var(--accent-blue);
-      font-weight: 500;
-      margin-bottom: 4px;
-    }
-    
-    .detail-title {
-      font-size: 15px;
-      font-weight: 600;
-      line-height: 1.4;
-    }
-    
-    .detail-close {
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 20px;
-      cursor: pointer;
-      padding: 0;
-      line-height: 1;
-    }
-    
-    .detail-close:hover { color: var(--text-primary); }
-    
-    .prob-section { margin-bottom: 14px; }
-    
-    .prob-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 13px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-    
-    .prob-yes { color: var(--accent-green); }
-    .prob-no { color: var(--accent-red); }
-    
-    .prob-bar {
-      height: 8px;
-      background: var(--border);
-      border-radius: 4px;
-      overflow: hidden;
-      display: flex;
-    }
-    
-    .prob-bar-yes {
-      background: linear-gradient(90deg, #22c55e, #4ade80);
-      transition: width 0.4s;
-    }
-    
-    .prob-bar-no {
-      background: linear-gradient(90deg, #f87171, #ef4444);
-      transition: width 0.4s;
-    }
-    
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-      margin-bottom: 14px;
-    }
-    
-    .stat-box {
-      background: rgba(31, 41, 55, 0.5);
-      border-radius: 8px;
-      padding: 10px;
-      text-align: center;
-    }
-    
-    .stat-box-label { font-size: 9px; color: var(--text-muted); }
-    .stat-box-value { font-size: 14px; font-weight: 700; margin-top: 2px; }
-    
-    .action-buttons { display: flex; gap: 8px; }
-    
-    .btn-trade {
-      flex: 1;
-      background: var(--accent-blue);
-      color: white;
-      padding: 10px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 13px;
-      text-align: center;
-      text-decoration: none;
-      border: none;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    
-    .btn-trade:hover { background: #2563eb; }
-    
-    .btn-icon {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      color: var(--text-primary);
-      padding: 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    
-    .btn-icon:hover { background: var(--border); }
-    
-    /* Legend */
-    .legend {
-      position: absolute;
-      bottom: 380px;
-      left: 16px;
-      z-index: 40;
-      background: var(--bg-card);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 12px;
-    }
-    
-    .legend-title {
-      font-size: 10px;
-      color: var(--text-muted);
-      font-weight: 500;
-      margin-bottom: 8px;
-    }
-    
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 11px;
-      color: var(--text-secondary);
-      margin-bottom: 4px;
-    }
-    
-    .legend-dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-    }
-    
-    .legend-dot.green { background: var(--accent-green); }
-    .legend-dot.yellow { background: var(--accent-yellow); }
-    .legend-dot.red { background: var(--accent-red); }
-    .legend-dot.pulse { animation: pulse 2s infinite; }
-    
-    .legend-line {
-      width: 16px; height: 2px;
-      background: var(--accent-purple);
-      border-radius: 1px;
-    }
-    
-    .legend-divider {
-      height: 1px;
-      background: var(--border);
-      margin: 8px 0;
-    }
-    
-    /* Category Tabs */
-    .category-tabs {
-      display: flex;
-      gap: 4px;
-      padding: 8px;
-      border-bottom: 1px solid var(--border);
-      overflow-x: auto;
-    }
-    
-    .category-tab {
-      padding: 6px 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 500;
-      cursor: pointer;
-      white-space: nowrap;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      transition: all 0.15s;
-    }
-    
-    .category-tab:hover { background: var(--border); color: var(--text-primary); }
-    .category-tab.active { background: var(--accent-blue); color: white; }
-    .category-tab.trump { 
-      background: linear-gradient(135deg, rgba(220, 38, 38, 0.2), rgba(59, 130, 246, 0.2));
-      border: 1px solid rgba(220, 38, 38, 0.3);
-    }
-    .category-tab.trump.active {
-      background: linear-gradient(135deg, #dc2626, #2563eb);
-    }
-    
-    /* Trump market highlight */
-    .market-item.trump-market {
-      border-left: 2px solid rgba(220, 38, 38, 0.5);
-    }
-    
-    .market-item.trump-market .market-item-location {
-      color: #f87171;
-    }
-    
-    /* Status indicator */
-    .status-bar {
-      position: absolute;
-      bottom: 8px; left: 50%;
-      transform: translateX(-50%);
-      z-index: 30;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--bg-card);
-      backdrop-filter: blur(8px);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 6px 14px;
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-    
-    .status-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--accent-green);
-      animation: pulse 2s infinite;
-    }
-    
-    .status-dot.offline { background: var(--accent-red); animation: none; }
-    
-    /* Unusual Whales Feed Panel */
-    .potus-panel {
-      position: absolute;
-      bottom: 60px;
-      left: 16px;
-      width: 320px;
-      z-index: 50;
-      background: var(--bg-card);
-      backdrop-filter: blur(12px);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    
-    .potus-header {
-      padding: 12px 14px;
-      background: linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(16, 185, 129, 0.2));
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-    
-    .potus-avatar {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, #3b82f6, #10b981);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      border: 2px solid rgba(255,255,255,0.2);
-    }
-    
-    .potus-title {
-      flex: 1;
-    }
-    
-    .potus-title h3 {
-      font-size: 13px;
-      font-weight: 600;
-      color: white;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    
-    .potus-title h3 .verified {
-      color: #10b981;
-      font-size: 14px;
-    }
-    
-    .potus-title p {
-      font-size: 10px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-    
-    .potus-content {
-      max-height: 260px;
-      overflow-y: auto;
-    }
-    
-    .potus-tweet {
-      padding: 10px;
-      border-radius: 8px;
-      margin-bottom: 6px;
-      transition: background 0.15s;
-      display: block;
-      text-decoration: none;
-      color: inherit;
-    }
-    
-    .potus-tweet:hover {
-      background: rgba(16, 185, 129, 0.1);
-    }
-    
-    .potus-tweet-text {
-      font-size: 12px;
-      line-height: 1.5;
-      color: var(--text-primary);
-      margin-bottom: 6px;
-    }
-    
-    .potus-tweet-time {
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-    
-    .potus-refresh {
-      padding: 4px 10px;
-      font-size: 10px;
-      background: rgba(16, 185, 129, 0.15);
-      color: #34d399;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    
-    .potus-refresh:hover {
-      background: rgba(16, 185, 129, 0.25);
-    }
-    
-    .potus-empty {
-      padding: 20px;
-      text-align: center;
-      color: var(--text-muted);
-      font-size: 11px;
-    }
-    
-    /* Twitter embed customization */
-    .potus-content .twitter-timeline {
-      display: block !important;
-      text-decoration: none;
-      color: inherit;
-    }
-    
-    .potus-content .twitter-timeline-rendered {
-      border-radius: 0 0 12px 12px !important;
-    }
-    
-    /* When Twitter embed loads, it replaces content with iframe */
-    .potus-content iframe {
-      border-radius: 0 0 12px 12px !important;
-      border: none !important;
-    }
-    
-    /* Sample tweet styling for fallback */
-    .potus-content .potus-tweet {
-      display: block;
-      text-decoration: none;
-      color: inherit;
+    /* Responsive */
+    @media (max-width: 1200px) {
+      .app-container {
+        grid-template-columns: 280px 1fr 300px;
+      }
     }
     
     @media (max-width: 900px) {
-      .markets-panel { display: none; }
-      .detail-panel { left: 12px; right: 12px; width: auto; bottom: 80px; transform: none; }
-      .search-input { width: 150px; }
-      .stats-bar { flex-direction: column; }
-      .potus-panel { display: none; }
-      .legend { bottom: 60px; left: 12px; }
+      .app-container {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr auto auto;
+        grid-template-areas:
+          "header"
+          "globe"
+          "left"
+          "ticker";
+      }
+      .right-panel { display: none; }
+      .left-panel { max-height: 300px; }
     }
   </style>
 </head>
 <body>
   <div id="root"></div>
-
+  
   <script type="text/babel">
     const { useState, useEffect, useRef, useCallback, useMemo } = React;
     const Globe = window.Globe;
 
-    // ==================== CONFIGURATION ====================
-    const CONFIG = {
-      POLYMARKET_API: 'https://gamma-api.polymarket.com',
-      CORS_PROXY: 'https://corsproxy.io/?',
-      REFRESH_INTERVAL: 60000,
-      // Smaller simplified borders (~500KB vs ~23MB)
-      COUNTRIES_GEOJSON: 'https://raw.githubusercontent.com/datasets/geo-boundaries-world-110m/master/countries.geojson',
-      // RSS to JSON service (free tier: 10k requests/day)
-      RSS2JSON_API: 'https://api.rss2json.com/v1/api.json',
-      // OSINT Twitter/X accounts to follow (via Nitter RSS)
-      OSINT_FEEDS: [
-        { handle: 'Liveuamap', name: 'Liveuamap' },
-        { handle: 'sentdefender', name: 'Sentinel' },
-        { handle: 'TheStudyofWar', name: 'War Studies' },
-        { handle: 'ELINTNews', name: 'ELINT News' },
-        { handle: 'War_Mapper', name: 'War Mapper' },
-        { handle: 'RALee85', name: 'Rob Lee' },
-        { handle: 'NOELreports', name: 'NOEL Reports' },
-      ],
-      // OPTIONAL: Deploy cloudflare-worker.js and set your URL here for more reliable feeds
-      // TWITTER_WORKER: 'https://your-worker.your-subdomain.workers.dev/feed',
-      TWITTER_WORKER: null, // Set to your worker URL to enable
-      // Multiple Nitter instances for fallback (updated Jan 2026)
-      NITTER_INSTANCES: [
-        'nitter.poast.org',
-        'nitter.privacydev.net',
-        'nitter.cz',
-        'nitter.net',
-        'nitter.1d4.us',
-        'nitter.kavin.rocks',
-        'nitter.unixfox.eu',
-      ],
+    // ==================== API CONFIGURATIONS ====================
+    const API = {
+      POLYMARKET: {
+        REST: 'https://gamma-api.polymarket.com',
+        WS: 'wss://ws-subscriptions-clob.polymarket.com/ws/market',
+        CORS_PROXIES: [
+          '',
+          'https://corsproxy.io/?',
+          'https://api.allorigins.win/raw?url=',
+        ]
+      },
+      MANIFOLD: {
+        REST: 'https://api.manifold.markets/v0',
+      },
+      NEWS: {
+        RSS_PROXY: 'https://api.rss2json.com/v1/api.json?rss_url=',
+        FEEDS: [
+          'https://feeds.bbci.co.uk/news/world/rss.xml',
+          'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',
+          'https://feeds.reuters.com/Reuters/worldNews',
+        ]
+      }
     };
-
-    // ==================== REAL-TIME POLYMARKET API ====================
-    const POLYMARKET_API = {
-      GAMMA_BASE: 'https://gamma-api.polymarket.com',
-      CLOB_BASE: 'https://clob.polymarket.com',
-      TAGS: ['politics', 'trump', 'geopolitics', 'elections', 'ukraine', 'middle-east', 'economy'],
-      // CORS proxies for browser-based requests
-      PROXIES: [
-        '', // Try direct first
-        'https://corsproxy.io/?',
-        'https://api.allorigins.win/raw?url=',
-      ]
-    };
-
-    // Fetch live markets from Polymarket Gamma API with CORS proxy fallback
-    async function fetchLiveMarkets() {
-      const baseUrl = `${POLYMARKET_API.GAMMA_BASE}/events?closed=false&active=true&limit=100`;
-      
-      for (const proxy of POLYMARKET_API.PROXIES) {
-        try {
-          const url = proxy ? proxy + encodeURIComponent(baseUrl) : baseUrl;
-          console.log('Trying Polymarket API' + (proxy ? ' via proxy' : ' direct') + '...');
-          
-          const res = await fetch(url, { 
-            headers: { 'Accept': 'application/json' },
-            signal: AbortSignal.timeout(10000) // 10s timeout
-          });
-          
-          if (!res.ok) {
-            console.log(`Failed with status ${res.status}`);
-            continue;
-          }
-          
-          const events = await res.json();
-          if (!Array.isArray(events) || events.length === 0) continue;
-          
-          console.log(`✓ Got ${events.length} events from Polymarket`);
-          
-          // Process events into markets format
-          const processedMarkets = [];
-          
-          for (const event of events) {
-            if (!event.markets || event.markets.length === 0) continue;
-            
-            const m = event.markets[0];
-            const question = event.title || m.question || '';
-            const q = question.toLowerCase();
-            
-            // Determine category
-            let category = 'Politics';
-            if (q.includes('trump') || q.includes('tariff') || q.includes('musk') || q.includes('doge') ||
-                q.includes('cabinet') || q.includes('deportation') || q.includes('greenland')) {
-              category = 'Trump';
-            } else if (q.includes('ukraine') || q.includes('russia') || q.includes('war') || 
-                       q.includes('iran') || q.includes('israel') || q.includes('military')) {
-              category = 'Conflict';
-            } else if (q.includes('bitcoin') || q.includes('crypto') || q.includes('fed') || 
-                       q.includes('rate') || q.includes('economy') || q.includes('recession')) {
-              category = 'Economy';
-            } else if (q.includes('trade') || q.includes('sanction')) {
-              category = 'Trade';
-            }
-            
-            // Filter for political/geopolitical content only
-            const isRelevant = category === 'Trump' || category === 'Conflict' || 
-                               q.includes('election') || q.includes('president') ||
-                               q.includes('congress') || q.includes('china') || q.includes('taiwan');
-            
-            if (!isRelevant) continue;
-            
-            // Parse prices
-            const prices = m.outcomePrices ? 
-              (typeof m.outcomePrices === 'string' ? m.outcomePrices : `${m.outcomePrices[0]},${m.outcomePrices[1]}`) :
-              '0.5,0.5';
-            
-            processedMarkets.push({
-              id: m.id || m.conditionId || `pm-${processedMarkets.length}`,
-              question: question,
-              outcomePrices: prices,
-              volume: m.volume || m.volumeNum || 0,
-              volume24hr: m.volume24hr || 0,
-              slug: m.slug || event.slug || '',
-              endDate: m.endDate || event.endDate || '',
-              category: category,
-              outcomes: m.outcomes || ['Yes', 'No'],
-              image: m.image || event.image,
-              liquidity: m.liquidity || m.liquidityNum || 0,
-              isLive: true,
-            });
-          }
-          
-          return processedMarkets;
-          
-        } catch (err) {
-          console.log('Failed:', err.message);
-          continue;
-        }
-      }
-      
-      console.log('All Polymarket API endpoints failed - using sample data');
-      return null;
-    }
-
-    // Extract location from tweet text
-    function extractLocationFromTweet(text) {
-      const lowerText = text.toLowerCase();
-      for (const [keyword, loc] of Object.entries(LOCATIONS)) {
-        if (lowerText.includes(keyword.toLowerCase())) {
-          return loc;
-        }
-      }
-      // Default to Ukraine for war-related content
-      if (lowerText.includes('front') || lowerText.includes('strike') || lowerText.includes('attack')) {
-        return LOCATIONS['ukraine'];
-      }
-      return null;
-    }
-
-    // Fetch Twitter feed via Nitter RSS with fallback instances
-    async function fetchTwitterFeed(feedConfig) {
-      const handle = feedConfig.handle;
-      const nitterInstances = feedConfig.nitter 
-        ? [feedConfig.nitter, ...CONFIG.NITTER_INSTANCES]
-        : CONFIG.NITTER_INSTANCES;
-      
-      // Method 1: Try RSS2JSON service with each Nitter instance
-      for (const nitter of nitterInstances) {
-        try {
-          const rssUrl = `https://${nitter}/${handle}/rss`;
-          const apiUrl = `${CONFIG.RSS2JSON_API}?rss_url=${encodeURIComponent(rssUrl)}`;
-          
-          console.log(`Trying ${nitter} for @${handle}...`);
-          
-          const res = await fetch(apiUrl);
-          if (!res.ok) {
-            console.log(`${nitter} returned ${res.status}, trying next...`);
-            continue;
-          }
-          
-          const data = await res.json();
-          if (data.status !== 'ok' || !data.items || data.items.length === 0) {
-            console.log(`${nitter} returned no items, trying next...`);
-            continue;
-          }
-          
-          console.log(`Success! Got ${data.items.length} items from ${nitter}`);
-          
-          return data.items.slice(0, 5).map((item, idx) => {
-            // Clean up tweet text (remove URLs, extra whitespace)
-            let text = item.title || item.description || '';
-            text = text.replace(/<[^>]+>/g, ''); // Remove HTML tags
-            text = text.replace(/https?:\/\/\S+/g, '').trim();
-            text = text.replace(/\s+/g, ' ').substring(0, 200);
-            
-            // Calculate time ago
-            const pubDate = new Date(item.pubDate);
-            const now = new Date();
-            const diffMs = now - pubDate;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMins / 60);
-            const timeAgo = diffHours > 0 ? `${diffHours}h ago` : `${diffMins}m ago`;
-            
-            // Get location
-            const loc = extractLocationFromTweet(text);
-            
-            return {
-              id: `${handle}-${idx}-${Date.now()}`,
-              source: `@${handle}`,
-              sourceName: feedConfig.name,
-              text: text,
-              time: timeAgo,
-              timestamp: pubDate,
-              link: item.link || `https://x.com/${handle}`,
-              lat: loc?.lat || (Math.random() * 60 - 30),
-              lng: loc?.lng || (Math.random() * 100 - 50),
-              location: loc?.country || 'Unknown',
-            };
-          });
-        } catch (err) {
-          console.log(`Failed ${nitter}: ${err.message}, trying next...`);
-          continue;
-        }
-      }
-      
-      // Method 2: Try CORS proxy with Nitter
-      for (const nitter of nitterInstances.slice(0, 2)) {
-        try {
-          const rssUrl = `https://${nitter}/${handle}/rss`;
-          const proxyUrl = `${CONFIG.CORS_PROXY}${encodeURIComponent(rssUrl)}`;
-          
-          console.log(`Trying CORS proxy with ${nitter}...`);
-          
-          const res = await fetch(proxyUrl);
-          if (!res.ok) continue;
-          
-          const xml = await res.text();
-          // Simple XML parsing for RSS items
-          const items = [];
-          const itemRegex = /<item>([\s\S]*?)<\/item>/g;
-          let match;
-          
-          while ((match = itemRegex.exec(xml)) !== null && items.length < 5) {
-            const itemXml = match[1];
-            const title = itemXml.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/)?.[1] || '';
-            const link = itemXml.match(/<link>(.*?)<\/link>/)?.[1] || `https://x.com/${handle}`;
-            const pubDate = itemXml.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
-            
-            let text = title.replace(/<[^>]+>/g, '').replace(/https?:\/\/\S+/g, '').trim();
-            if (text.length > 10) {
-              const date = new Date(pubDate);
-              const diffMs = Date.now() - date;
-              const diffHours = Math.floor(diffMs / 3600000);
-              
-              items.push({
-                id: `${handle}-${items.length}-${Date.now()}`,
-                source: `@${handle}`,
-                sourceName: feedConfig.name,
-                text: text.substring(0, 200),
-                time: diffHours > 0 ? `${diffHours}h ago` : 'Just now',
-                timestamp: date,
-                link: link,
-                lat: 38.9 + Math.random() * 2,
-                lng: -77 + Math.random() * 2,
-                location: 'USA',
-              });
-            }
-          }
-          
-          if (items.length > 0) {
-            console.log(`CORS proxy success! Got ${items.length} items`);
-            return items;
-          }
-        } catch (err) {
-          console.log(`CORS proxy failed: ${err.message}`);
-        }
-      }
-      
-      console.log(`All methods failed for @${handle}`);
-      return [];
-    }
-
-    // Fetch all OSINT feeds
-    async function fetchAllOsintFeeds() {
-      const allFeeds = await Promise.all(
-        CONFIG.OSINT_FEEDS.map(feed => fetchTwitterFeed(feed))
-      );
-      
-      // Flatten, sort by timestamp, take most recent 15
-      const combined = allFeeds
-        .flat()
-        .filter(item => item.text.length > 20)
-        .sort((a, b) => b.timestamp - a.timestamp)
-        .slice(0, 15);
-      
-      return combined;
-    }
 
     // ==================== LOCATION DATABASE ====================
     const LOCATIONS = {
-      // Europe
+      'trump': { lat: 38.9, lng: -77, country: 'USA', region: 'Americas' },
+      'biden': { lat: 38.9, lng: -77, country: 'USA', region: 'Americas' },
+      'usa': { lat: 39.8, lng: -98.5, country: 'USA', region: 'Americas' },
+      'america': { lat: 39.8, lng: -98.5, country: 'USA', region: 'Americas' },
+      'fed': { lat: 38.89, lng: -77.04, country: 'USA', region: 'Americas' },
+      'congress': { lat: 38.89, lng: -77.01, country: 'USA', region: 'Americas' },
+      'white house': { lat: 38.9, lng: -77.04, country: 'USA', region: 'Americas' },
+      'tariff': { lat: 38.9, lng: -77, country: 'USA', region: 'Americas' },
       'ukraine': { lat: 48.38, lng: 31.17, country: 'Ukraine', region: 'Europe' },
-      'kyiv': { lat: 50.45, lng: 30.52, country: 'Ukraine', region: 'Europe' },
       'russia': { lat: 55.76, lng: 37.62, country: 'Russia', region: 'Europe' },
-      'moscow': { lat: 55.76, lng: 37.62, country: 'Russia', region: 'Europe' },
       'putin': { lat: 55.76, lng: 37.62, country: 'Russia', region: 'Europe' },
-      'kremlin': { lat: 55.75, lng: 37.62, country: 'Russia', region: 'Europe' },
+      'china': { lat: 39.9, lng: 116.4, country: 'China', region: 'Asia' },
+      'taiwan': { lat: 25.03, lng: 121.57, country: 'Taiwan', region: 'Asia' },
+      'iran': { lat: 35.69, lng: 51.39, country: 'Iran', region: 'Middle East' },
+      'israel': { lat: 31.77, lng: 35.22, country: 'Israel', region: 'Middle East' },
+      'gaza': { lat: 31.5, lng: 34.47, country: 'Gaza', region: 'Middle East' },
+      'germany': { lat: 52.52, lng: 13.41, country: 'Germany', region: 'Europe' },
+      'france': { lat: 48.86, lng: 2.35, country: 'France', region: 'Europe' },
       'uk': { lat: 51.51, lng: -0.13, country: 'UK', region: 'Europe' },
       'britain': { lat: 51.51, lng: -0.13, country: 'UK', region: 'Europe' },
-      'london': { lat: 51.51, lng: -0.13, country: 'UK', region: 'Europe' },
-      'starmer': { lat: 51.51, lng: -0.13, country: 'UK', region: 'Europe' },
-      'germany': { lat: 52.52, lng: 13.41, country: 'Germany', region: 'Europe' },
-      'berlin': { lat: 52.52, lng: 13.41, country: 'Germany', region: 'Europe' },
-      'scholz': { lat: 52.52, lng: 13.41, country: 'Germany', region: 'Europe' },
-      'france': { lat: 48.86, lng: 2.35, country: 'France', region: 'Europe' },
-      'paris': { lat: 48.86, lng: 2.35, country: 'France', region: 'Europe' },
-      'macron': { lat: 48.86, lng: 2.35, country: 'France', region: 'Europe' },
-      'italy': { lat: 41.90, lng: 12.50, country: 'Italy', region: 'Europe' },
-      'meloni': { lat: 41.90, lng: 12.50, country: 'Italy', region: 'Europe' },
-      'poland': { lat: 52.23, lng: 21.01, country: 'Poland', region: 'Europe' },
-      'nato': { lat: 50.85, lng: 4.36, country: 'NATO HQ', region: 'Europe' },
+      'nato': { lat: 50.85, lng: 4.36, country: 'NATO', region: 'Europe' },
       'eu': { lat: 50.85, lng: 4.35, country: 'EU', region: 'Europe' },
-      'europe': { lat: 50.85, lng: 4.35, country: 'Europe', region: 'Europe' },
-      'brussels': { lat: 50.85, lng: 4.35, country: 'Belgium', region: 'Europe' },
-      'netherlands': { lat: 52.37, lng: 4.90, country: 'Netherlands', region: 'Europe' },
-      'spain': { lat: 40.42, lng: -3.70, country: 'Spain', region: 'Europe' },
-      'portugal': { lat: 38.72, lng: -9.14, country: 'Portugal', region: 'Europe' },
-      'sweden': { lat: 59.33, lng: 18.07, country: 'Sweden', region: 'Europe' },
-      'finland': { lat: 60.17, lng: 24.94, country: 'Finland', region: 'Europe' },
-      'norway': { lat: 59.91, lng: 10.75, country: 'Norway', region: 'Europe' },
-      'denmark': { lat: 55.68, lng: 12.57, country: 'Denmark', region: 'Europe' },
-      'greece': { lat: 37.98, lng: 23.73, country: 'Greece', region: 'Europe' },
-      'turkey': { lat: 39.93, lng: 32.86, country: 'Turkey', region: 'Europe' },
-      'erdogan': { lat: 39.93, lng: 32.86, country: 'Turkey', region: 'Europe' },
-      'hungary': { lat: 47.50, lng: 19.04, country: 'Hungary', region: 'Europe' },
-      'orban': { lat: 47.50, lng: 19.04, country: 'Hungary', region: 'Europe' },
-      'serbia': { lat: 44.79, lng: 20.50, country: 'Serbia', region: 'Europe' },
-      'romania': { lat: 44.43, lng: 26.10, country: 'Romania', region: 'Europe' },
-      'bulgaria': { lat: 42.70, lng: 23.32, country: 'Bulgaria', region: 'Europe' },
-      'czech': { lat: 50.08, lng: 14.44, country: 'Czech Republic', region: 'Europe' },
-      'austria': { lat: 48.21, lng: 16.37, country: 'Austria', region: 'Europe' },
-      'switzerland': { lat: 46.95, lng: 7.45, country: 'Switzerland', region: 'Europe' },
-      'belarus': { lat: 53.90, lng: 27.57, country: 'Belarus', region: 'Europe' },
-      'lukashenko': { lat: 53.90, lng: 27.57, country: 'Belarus', region: 'Europe' },
-      'moldova': { lat: 47.01, lng: 28.86, country: 'Moldova', region: 'Europe' },
-      'georgia': { lat: 41.72, lng: 44.79, country: 'Georgia', region: 'Europe' },
-      'armenia': { lat: 40.18, lng: 44.51, country: 'Armenia', region: 'Europe' },
-      'azerbaijan': { lat: 40.41, lng: 49.87, country: 'Azerbaijan', region: 'Europe' },
-      'pokrovsk': { lat: 48.28, lng: 37.18, country: 'Ukraine', region: 'Europe' },
-      'crimea': { lat: 44.95, lng: 34.10, country: 'Crimea', region: 'Europe' },
-      'donbas': { lat: 48.02, lng: 37.80, country: 'Ukraine', region: 'Europe' },
-      'zelensky': { lat: 50.45, lng: 30.52, country: 'Ukraine', region: 'Europe' },
-      'ceasefire': { lat: 48.38, lng: 31.17, country: 'Ukraine', region: 'Europe' },
-      
-      // Middle East
-      'israel': { lat: 31.77, lng: 35.21, country: 'Israel', region: 'Middle East' },
-      'tel aviv': { lat: 32.08, lng: 34.78, country: 'Israel', region: 'Middle East' },
-      'netanyahu': { lat: 31.77, lng: 35.21, country: 'Israel', region: 'Middle East' },
-      'gaza': { lat: 31.50, lng: 34.47, country: 'Gaza', region: 'Middle East' },
-      'hamas': { lat: 31.50, lng: 34.47, country: 'Gaza', region: 'Middle East' },
-      'iran': { lat: 35.69, lng: 51.39, country: 'Iran', region: 'Middle East' },
-      'tehran': { lat: 35.69, lng: 51.39, country: 'Iran', region: 'Middle East' },
-      'khamenei': { lat: 35.69, lng: 51.39, country: 'Iran', region: 'Middle East' },
-      'syria': { lat: 33.51, lng: 36.28, country: 'Syria', region: 'Middle East' },
-      'damascus': { lat: 33.51, lng: 36.28, country: 'Syria', region: 'Middle East' },
-      'assad': { lat: 33.51, lng: 36.28, country: 'Syria', region: 'Middle East' },
-      'lebanon': { lat: 33.89, lng: 35.50, country: 'Lebanon', region: 'Middle East' },
-      'beirut': { lat: 33.89, lng: 35.50, country: 'Lebanon', region: 'Middle East' },
-      'hezbollah': { lat: 33.89, lng: 35.50, country: 'Lebanon', region: 'Middle East' },
-      'saudi': { lat: 24.71, lng: 46.68, country: 'Saudi Arabia', region: 'Middle East' },
-      'riyadh': { lat: 24.71, lng: 46.68, country: 'Saudi Arabia', region: 'Middle East' },
-      'mbs': { lat: 24.71, lng: 46.68, country: 'Saudi Arabia', region: 'Middle East' },
-      'yemen': { lat: 15.37, lng: 44.19, country: 'Yemen', region: 'Middle East' },
-      'houthi': { lat: 15.37, lng: 44.19, country: 'Yemen', region: 'Middle East' },
-      'red sea': { lat: 20.00, lng: 38.00, country: 'Red Sea', region: 'Middle East' },
-      'iraq': { lat: 33.31, lng: 44.37, country: 'Iraq', region: 'Middle East' },
-      'baghdad': { lat: 33.31, lng: 44.37, country: 'Iraq', region: 'Middle East' },
-      'jordan': { lat: 31.95, lng: 35.93, country: 'Jordan', region: 'Middle East' },
-      'uae': { lat: 24.45, lng: 54.37, country: 'UAE', region: 'Middle East' },
-      'dubai': { lat: 25.20, lng: 55.27, country: 'UAE', region: 'Middle East' },
-      'qatar': { lat: 25.29, lng: 51.53, country: 'Qatar', region: 'Middle East' },
-      'kuwait': { lat: 29.38, lng: 47.99, country: 'Kuwait', region: 'Middle East' },
-      'oman': { lat: 23.59, lng: 58.55, country: 'Oman', region: 'Middle East' },
-      'bahrain': { lat: 26.23, lng: 50.59, country: 'Bahrain', region: 'Middle East' },
-      
-      // Asia
-      'china': { lat: 39.90, lng: 116.41, country: 'China', region: 'Asia' },
-      'beijing': { lat: 39.90, lng: 116.41, country: 'China', region: 'Asia' },
-      'xi jinping': { lat: 39.90, lng: 116.41, country: 'China', region: 'Asia' },
-      'shanghai': { lat: 31.23, lng: 121.47, country: 'China', region: 'Asia' },
-      'taiwan': { lat: 25.03, lng: 121.57, country: 'Taiwan', region: 'Asia' },
-      'taipei': { lat: 25.03, lng: 121.57, country: 'Taiwan', region: 'Asia' },
-      'japan': { lat: 35.68, lng: 139.65, country: 'Japan', region: 'Asia' },
-      'tokyo': { lat: 35.68, lng: 139.65, country: 'Japan', region: 'Asia' },
-      'kishida': { lat: 35.68, lng: 139.65, country: 'Japan', region: 'Asia' },
-      'south korea': { lat: 37.57, lng: 126.98, country: 'South Korea', region: 'Asia' },
-      'seoul': { lat: 37.57, lng: 126.98, country: 'South Korea', region: 'Asia' },
-      'yoon': { lat: 37.57, lng: 126.98, country: 'South Korea', region: 'Asia' },
-      'north korea': { lat: 39.04, lng: 125.76, country: 'North Korea', region: 'Asia' },
-      'pyongyang': { lat: 39.04, lng: 125.76, country: 'North Korea', region: 'Asia' },
-      'kim jong': { lat: 39.04, lng: 125.76, country: 'North Korea', region: 'Asia' },
+      'venezuela': { lat: 10.5, lng: -66.9, country: 'Venezuela', region: 'Americas' },
+      'brazil': { lat: -15.8, lng: -47.9, country: 'Brazil', region: 'Americas' },
       'india': { lat: 28.61, lng: 77.21, country: 'India', region: 'Asia' },
-      'delhi': { lat: 28.61, lng: 77.21, country: 'India', region: 'Asia' },
-      'modi': { lat: 28.61, lng: 77.21, country: 'India', region: 'Asia' },
-      'pakistan': { lat: 33.68, lng: 73.05, country: 'Pakistan', region: 'Asia' },
-      'islamabad': { lat: 33.68, lng: 73.05, country: 'Pakistan', region: 'Asia' },
-      'kashmir': { lat: 34.08, lng: 74.80, country: 'Kashmir', region: 'Asia' },
-      'afghanistan': { lat: 34.53, lng: 69.17, country: 'Afghanistan', region: 'Asia' },
-      'kabul': { lat: 34.53, lng: 69.17, country: 'Afghanistan', region: 'Asia' },
-      'taliban': { lat: 34.53, lng: 69.17, country: 'Afghanistan', region: 'Asia' },
-      'vietnam': { lat: 21.03, lng: 105.85, country: 'Vietnam', region: 'Asia' },
-      'thailand': { lat: 13.76, lng: 100.50, country: 'Thailand', region: 'Asia' },
-      'philippines': { lat: 14.60, lng: 120.98, country: 'Philippines', region: 'Asia' },
-      'marcos': { lat: 14.60, lng: 120.98, country: 'Philippines', region: 'Asia' },
-      'indonesia': { lat: -6.21, lng: 106.85, country: 'Indonesia', region: 'Asia' },
-      'malaysia': { lat: 3.14, lng: 101.69, country: 'Malaysia', region: 'Asia' },
-      'singapore': { lat: 1.35, lng: 103.82, country: 'Singapore', region: 'Asia' },
-      'myanmar': { lat: 19.75, lng: 96.10, country: 'Myanmar', region: 'Asia' },
-      'bangladesh': { lat: 23.81, lng: 90.41, country: 'Bangladesh', region: 'Asia' },
-      'sri lanka': { lat: 6.93, lng: 79.85, country: 'Sri Lanka', region: 'Asia' },
-      'nepal': { lat: 27.72, lng: 85.32, country: 'Nepal', region: 'Asia' },
-      'mongolia': { lat: 47.89, lng: 106.91, country: 'Mongolia', region: 'Asia' },
-      
-      // Americas
-      'usa': { lat: 38.91, lng: -77.04, country: 'USA', region: 'Americas' },
-      'america': { lat: 38.91, lng: -77.04, country: 'USA', region: 'Americas' },
-      'washington': { lat: 38.91, lng: -77.04, country: 'USA', region: 'Americas' },
-      'white house': { lat: 38.90, lng: -77.04, country: 'USA', region: 'Americas' },
-      'pentagon': { lat: 38.87, lng: -77.06, country: 'USA', region: 'Americas' },
-      'congress': { lat: 38.89, lng: -77.01, country: 'USA', region: 'Americas' },
-      'trump': { lat: 38.91, lng: -77.04, country: 'USA', region: 'Americas' },
-      'biden': { lat: 38.91, lng: -77.04, country: 'USA', region: 'Americas' },
-      'republican': { lat: 38.91, lng: -77.04, country: 'USA', region: 'Americas' },
-      'democrat': { lat: 38.91, lng: -77.04, country: 'USA', region: 'Americas' },
-      'fed': { lat: 38.89, lng: -77.05, country: 'USA', region: 'Americas' },
-      'new york': { lat: 40.71, lng: -74.01, country: 'USA', region: 'Americas' },
-      'california': { lat: 36.78, lng: -119.42, country: 'USA', region: 'Americas' },
-      'texas': { lat: 31.97, lng: -99.90, country: 'USA', region: 'Americas' },
-      'florida': { lat: 27.66, lng: -81.52, country: 'USA', region: 'Americas' },
-      'canada': { lat: 45.42, lng: -75.70, country: 'Canada', region: 'Americas' },
-      'ottawa': { lat: 45.42, lng: -75.70, country: 'Canada', region: 'Americas' },
-      'trudeau': { lat: 45.42, lng: -75.70, country: 'Canada', region: 'Americas' },
-      'mexico': { lat: 19.43, lng: -99.13, country: 'Mexico', region: 'Americas' },
-      'sheinbaum': { lat: 19.43, lng: -99.13, country: 'Mexico', region: 'Americas' },
-      'brazil': { lat: -15.80, lng: -47.89, country: 'Brazil', region: 'Americas' },
-      'brasilia': { lat: -15.80, lng: -47.89, country: 'Brazil', region: 'Americas' },
-      'lula': { lat: -15.80, lng: -47.89, country: 'Brazil', region: 'Americas' },
-      'argentina': { lat: -34.60, lng: -58.38, country: 'Argentina', region: 'Americas' },
-      'milei': { lat: -34.60, lng: -58.38, country: 'Argentina', region: 'Americas' },
-      'venezuela': { lat: 10.48, lng: -66.90, country: 'Venezuela', region: 'Americas' },
-      'caracas': { lat: 10.48, lng: -66.90, country: 'Venezuela', region: 'Americas' },
-      'maduro': { lat: 10.48, lng: -66.90, country: 'Venezuela', region: 'Americas' },
-      'colombia': { lat: 4.71, lng: -74.07, country: 'Colombia', region: 'Americas' },
-      'chile': { lat: -33.45, lng: -70.67, country: 'Chile', region: 'Americas' },
-      'peru': { lat: -12.05, lng: -77.04, country: 'Peru', region: 'Americas' },
-      'ecuador': { lat: -0.18, lng: -78.47, country: 'Ecuador', region: 'Americas' },
-      'cuba': { lat: 23.11, lng: -82.37, country: 'Cuba', region: 'Americas' },
-      'haiti': { lat: 18.59, lng: -72.31, country: 'Haiti', region: 'Americas' },
-      'panama': { lat: 8.98, lng: -79.52, country: 'Panama', region: 'Americas' },
-      'nicaragua': { lat: 12.11, lng: -86.27, country: 'Nicaragua', region: 'Americas' },
-      
-      // Africa
-      'africa': { lat: -1.29, lng: 36.82, country: 'Africa', region: 'Africa' },
-      'nigeria': { lat: 9.08, lng: 7.50, country: 'Nigeria', region: 'Africa' },
-      'south africa': { lat: -25.75, lng: 28.23, country: 'South Africa', region: 'Africa' },
-      'egypt': { lat: 30.04, lng: 31.24, country: 'Egypt', region: 'Africa' },
-      'cairo': { lat: 30.04, lng: 31.24, country: 'Egypt', region: 'Africa' },
-      'sisi': { lat: 30.04, lng: 31.24, country: 'Egypt', region: 'Africa' },
-      'ethiopia': { lat: 9.03, lng: 38.75, country: 'Ethiopia', region: 'Africa' },
-      'kenya': { lat: -1.29, lng: 36.82, country: 'Kenya', region: 'Africa' },
-      'sudan': { lat: 15.50, lng: 32.56, country: 'Sudan', region: 'Africa' },
-      'libya': { lat: 32.90, lng: 13.19, country: 'Libya', region: 'Africa' },
-      'algeria': { lat: 36.74, lng: 3.06, country: 'Algeria', region: 'Africa' },
-      'morocco': { lat: 34.02, lng: -6.83, country: 'Morocco', region: 'Africa' },
-      'tunisia': { lat: 36.81, lng: 10.17, country: 'Tunisia', region: 'Africa' },
-      'congo': { lat: -4.44, lng: 15.27, country: 'DRC', region: 'Africa' },
-      'ghana': { lat: 5.56, lng: -0.19, country: 'Ghana', region: 'Africa' },
-      'tanzania': { lat: -6.17, lng: 35.74, country: 'Tanzania', region: 'Africa' },
-      'rwanda': { lat: -1.94, lng: 29.87, country: 'Rwanda', region: 'Africa' },
-      'mali': { lat: 12.64, lng: -8.00, country: 'Mali', region: 'Africa' },
-      'niger': { lat: 13.51, lng: 2.11, country: 'Niger', region: 'Africa' },
-      'somalia': { lat: 2.05, lng: 45.32, country: 'Somalia', region: 'Africa' },
-      
-      // Oceania
-      'australia': { lat: -35.28, lng: 149.13, country: 'Australia', region: 'Oceania' },
-      'canberra': { lat: -35.28, lng: 149.13, country: 'Australia', region: 'Oceania' },
-      'sydney': { lat: -33.87, lng: 151.21, country: 'Australia', region: 'Oceania' },
-      'new zealand': { lat: -41.29, lng: 174.78, country: 'New Zealand', region: 'Oceania' },
-      'wellington': { lat: -41.29, lng: 174.78, country: 'New Zealand', region: 'Oceania' },
-      'pacific': { lat: -10.00, lng: 160.00, country: 'Pacific', region: 'Oceania' },
-      
-      // Global/Generic
-      'war': { lat: 48.38, lng: 31.17, country: 'Ukraine', region: 'Europe' },
-      'nuclear': { lat: 46.00, lng: 25.00, country: 'Global', region: 'Global' },
-      'climate': { lat: 0.00, lng: 0.00, country: 'Global', region: 'Global' },
-      'oil': { lat: 24.71, lng: 46.68, country: 'Saudi Arabia', region: 'Middle East' },
-      'opec': { lat: 24.71, lng: 46.68, country: 'OPEC', region: 'Middle East' },
+      'japan': { lat: 35.68, lng: 139.69, country: 'Japan', region: 'Asia' },
+      'korea': { lat: 37.57, lng: 126.98, country: 'South Korea', region: 'Asia' },
+      'north korea': { lat: 39.03, lng: 125.75, country: 'North Korea', region: 'Asia' },
       'bitcoin': { lat: 37.77, lng: -122.42, country: 'Global', region: 'Americas' },
       'crypto': { lat: 37.77, lng: -122.42, country: 'Global', region: 'Americas' },
+      'greenland': { lat: 71.71, lng: -42.6, country: 'Greenland', region: 'Americas' },
+      'canada': { lat: 45.42, lng: -75.69, country: 'Canada', region: 'Americas' },
+      'mexico': { lat: 19.43, lng: -99.13, country: 'Mexico', region: 'Americas' },
+      'syria': { lat: 33.51, lng: 36.29, country: 'Syria', region: 'Middle East' },
+      'saudi': { lat: 24.71, lng: 46.68, country: 'Saudi Arabia', region: 'Middle East' },
+      'turkey': { lat: 39.93, lng: 32.86, country: 'Turkey', region: 'Europe' },
+      'poland': { lat: 52.23, lng: 21.01, country: 'Poland', region: 'Europe' },
+      'australia': { lat: -35.28, lng: 149.13, country: 'Australia', region: 'Oceania' },
+      'africa': { lat: -1.29, lng: 36.82, country: 'Kenya', region: 'Africa' },
+      'nigeria': { lat: 9.08, lng: 7.4, country: 'Nigeria', region: 'Africa' },
+      'south africa': { lat: -25.75, lng: 28.19, country: 'South Africa', region: 'Africa' },
+      'argentina': { lat: -34.6, lng: -58.38, country: 'Argentina', region: 'Americas' },
+      'election': { lat: 38.9, lng: -77, country: 'USA', region: 'Americas' },
+      'war': { lat: 48.38, lng: 31.17, country: 'Ukraine', region: 'Europe' },
+      'military': { lat: 38.87, lng: -77.06, country: 'USA', region: 'Americas' },
     };
 
-    // ==================== LIVE ANIMATION GENERATORS ====================
+    // ==================== DATA FETCHING ====================
     
-    // Generate animated arcs from DC to major markets
-    function generateTradeArcs(markets) {
-      const dcLat = 38.9, dcLng = -77;
-      const highVolumeMarkets = markets
-        .filter(m => parseFloat(m.volume) > 1000000 && m.lat && m.lng)
-        .filter(m => Math.abs(m.lat - dcLat) > 5 || Math.abs(m.lng - dcLng) > 10) // Not too close to DC
-        .slice(0, 15);
-      
-      return highVolumeMarkets.map((m, i) => ({
-        startLat: dcLat,
-        startLng: dcLng,
-        endLat: m.lat,
-        endLng: m.lng,
-        color: m.category === 'Conflict' ? ['rgba(239, 68, 68, 0.8)', 'rgba(249, 115, 22, 0.4)'] : 
-               m.category === 'Trump' ? ['rgba(239, 68, 68, 0.9)', 'rgba(239, 68, 68, 0.3)'] :
-               m.category === 'Economy' ? ['rgba(34, 197, 94, 0.8)', 'rgba(16, 185, 129, 0.4)'] :
-               ['rgba(59, 130, 246, 0.8)', 'rgba(139, 92, 246, 0.4)'],
-        stroke: Math.min(2.5, 0.8 + parseFloat(m.volume) / 50000000),
-        dashLength: 0.4,
-        dashGap: 0.2,
-        dashAnimateTime: 1500 + (i % 5) * 300,
-        altitude: 0.15 + (i % 3) * 0.08,
-        label: m.question?.substring(0, 20),
-      }));
-    }
-    
-    // Generate pulsing rings around high-activity markets  
-    function generatePulseRings(markets) {
-      return markets
-        .filter(m => (parseFloat(m.volume) > 3000000 || m.category === 'Trump') && m.lat && m.lng)
-        .slice(0, 20)
-        .map((m, i) => ({
-          lat: m.lat,
-          lng: m.lng,
-          maxR: m.category === 'Trump' ? 4 : 2.5,
-          propagationSpeed: 1.5 + (i % 3) * 0.5,
-          repeatPeriod: 1200 + (i % 4) * 400,
-          color: m.category === 'Trump' ? 'rgba(239, 68, 68, 0.6)' : 
-                 m.yesPrice > 0.7 ? 'rgba(34, 197, 94, 0.5)' :
-                 m.yesPrice < 0.3 ? 'rgba(239, 68, 68, 0.5)' : 'rgba(245, 158, 11, 0.5)',
-          altitude: 0.005,
-        }));
-    }
-    
-    // Generate "satellite" points orbiting hotspots
-    function generateOrbitalPoints(markets) {
-      const hotspots = markets
-        .filter(m => parseFloat(m.volume) > 10000000)
-        .slice(0, 5);
-      
-      const orbitals = [];
-      hotspots.forEach((m, hi) => {
-        for (let i = 0; i < 3; i++) {
-          const angle = (i / 3) * Math.PI * 2 + (hi * 0.5);
-          const radius = 3 + i;
-          orbitals.push({
-            centerLat: m.lat,
-            centerLng: m.lng,
-            angle: angle,
-            radius: radius,
-            speed: 0.02 + i * 0.01,
-            color: m.category === 'Trump' ? '#ef4444' : '#3b82f6',
-            size: 0.3,
+    // Fetch from Polymarket
+    async function fetchPolymarket() {
+      for (const proxy of API.POLYMARKET.CORS_PROXIES) {
+        try {
+          const baseUrl = `${API.POLYMARKET.REST}/events?closed=false&active=true&limit=100`;
+          const url = proxy ? proxy + encodeURIComponent(baseUrl) : baseUrl;
+          
+          const res = await fetch(url, { 
+            signal: AbortSignal.timeout(10000) 
           });
-        }
-      });
-      return orbitals;
-    }
-    
-    // Generate connection lines between related markets
-    function generateMarketConnections(markets) {
-      const connections = [];
-      const trumpMarkets = markets.filter(m => m.category === 'Trump' && m.lat && m.lng).slice(0, 8);
-      const conflictMarkets = markets.filter(m => m.category === 'Conflict' && m.lat && m.lng).slice(0, 5);
-      
-      // Connect Trump markets to each other (web effect)
-      for (let i = 0; i < trumpMarkets.length; i++) {
-        for (let j = i + 1; j < Math.min(i + 3, trumpMarkets.length); j++) {
-          connections.push({
-            startLat: trumpMarkets[i].lat,
-            startLng: trumpMarkets[i].lng,
-            endLat: trumpMarkets[j].lat,
-            endLng: trumpMarkets[j].lng,
-            color: 'rgba(239, 68, 68, 0.15)',
-            stroke: 0.5,
+          
+          if (!res.ok) continue;
+          const events = await res.json();
+          
+          if (!Array.isArray(events)) continue;
+          
+          return events.flatMap(event => {
+            if (!event.markets?.length) return [];
+            return event.markets.map(m => ({
+              id: m.id || m.conditionId,
+              question: event.title || m.question,
+              probability: parseFloat(m.outcomePrices?.split(',')[0] || 0.5),
+              volume: parseFloat(m.volume || 0),
+              source: 'polymarket',
+              slug: m.slug || event.slug,
+              endDate: m.endDate || event.endDate,
+              url: `https://polymarket.com/event/${event.slug}`,
+            }));
           });
+        } catch (e) {
+          console.log('Polymarket fetch failed, trying next proxy...');
         }
       }
-      
-      // Connect conflict markets
-      for (let i = 0; i < conflictMarkets.length - 1; i++) {
-        connections.push({
-          startLat: conflictMarkets[i].lat,
-          startLng: conflictMarkets[i].lng,
-          endLat: conflictMarkets[i + 1].lat,
-          endLng: conflictMarkets[i + 1].lng,
-          color: 'rgba(249, 115, 22, 0.2)',
-          stroke: 0.4,
+      return [];
+    }
+    
+    // Fetch from Manifold Markets
+    async function fetchManifold() {
+      try {
+        const res = await fetch(`${API.MANIFOLD.REST}/markets?limit=50&sort=liquidity`, {
+          signal: AbortSignal.timeout(10000)
         });
+        
+        if (!res.ok) return [];
+        const markets = await res.json();
+        
+        return markets
+          .filter(m => m.outcomeType === 'BINARY')
+          .map(m => ({
+            id: `manifold-${m.id}`,
+            question: m.question,
+            probability: m.probability || 0.5,
+            volume: m.volume || 0,
+            source: 'manifold',
+            slug: m.slug,
+            url: m.url,
+            creatorName: m.creatorName,
+          }));
+      } catch (e) {
+        console.log('Manifold fetch failed:', e.message);
+        return [];
       }
-      
-      return connections;
     }
-
-    // ==================== SAMPLE MARKETS DATA (Trump prioritized, then others) ====================
     
-    // TRUMP MARKETS (Prioritized - from polymarket.com/politics/trump) - Updated Jan 19, 2026
-    const TRUMP_MARKETS = [
-      // Highest Volume Markets
-      { id: 'trump-1', question: 'Who will Trump nominate as Fed Chair?', outcomePrices: '0.62,0.38', volume: '216000000', slug: 'who-will-trump-nominate-as-fed-chair', endDate: '2027-01-20', category: 'Trump', topOutcome: 'Kevin Warsh 62%' },
-      { id: 'trump-2', question: 'Will Trump acquire Greenland before 2027?', outcomePrices: '0.20,0.80', volume: '16000000', slug: 'will-trump-acquire-greenland-before-2027', endDate: '2027-01-01', category: 'Trump' },
-      { id: 'trump-3', question: 'Venezuela leader end of 2026?', outcomePrices: '0.54,0.46', volume: '8000000', slug: 'venezuela-leader-end-of-2026', endDate: '2026-12-31', category: 'Trump', topOutcome: 'Delcy Rodríguez 54%' },
-      { id: 'trump-4', question: 'Will Melania say "Career" during AI talk on Friday?', outcomePrices: '0.01,0.99', volume: '6000000', slug: 'melania-ai-talk', endDate: '2026-01-17', category: 'Trump' },
-      { id: 'trump-5', question: 'How many people will Trump deport in 2025?', outcomePrices: '0.87,0.13', volume: '5000000', slug: 'how-many-people-will-trump-deport-in-2025', endDate: '2025-12-31', category: 'Trump', topOutcome: '250-500k 87%' },
+    // Fetch news from RSS feeds
+    async function fetchNews() {
+      const allNews = [];
       
-      // Tariffs & Trade
-      { id: 'trump-6', question: 'How much revenue will the U.S. raise from tariffs in 2025?', outcomePrices: '0.57,0.43', volume: '3000000', slug: 'us-tariff-revenue-2025', endDate: '2025-12-31', category: 'Trump', topOutcome: '<$100b 57%' },
-      { id: 'trump-7', question: 'Supreme Court rules in favor of Trump\'s tariffs?', outcomePrices: '0.30,0.70', volume: '3000000', slug: 'supreme-court-trump-tariffs', endDate: '2026-12-31', category: 'Trump' },
-      { id: 'trump-8', question: 'Will the Court Force Trump to Refund Tariffs?', outcomePrices: '0.22,0.78', volume: '1500000', slug: 'court-trump-refund-tariffs', endDate: '2026-06-30', category: 'Trump' },
-      { id: 'trump-9', question: 'Will any of Trump\'s Greenland Tariffs go into effect by Feb 1?', outcomePrices: '0.42,0.58', volume: '97000', slug: 'trump-greenland-tariffs-feb', endDate: '2026-02-01', category: 'Trump' },
-      { id: 'trump-10', question: 'Will all of Trump\'s Greenland Tariffs go into effect by Feb 1?', outcomePrices: '0.17,0.83', volume: '49000', slug: 'trump-all-greenland-tariffs-feb', endDate: '2026-02-01', category: 'Trump' },
-      
-      // Greenland
-      { id: 'trump-11', question: 'Will the US acquire part of Greenland in 2026?', outcomePrices: '0.24,0.76', volume: '3000000', slug: 'us-acquire-greenland-2026', endDate: '2026-12-31', category: 'Trump' },
-      { id: 'trump-12', question: 'Odds Trump acquires Greenland before 2027 hit 30% by March 31?', outcomePrices: '0.28,0.72', volume: '469000', slug: 'trump-greenland-odds-30', endDate: '2026-03-31', category: 'Trump' },
-      { id: 'trump-13', question: 'Which countries will Trump\'s Greenland Tariffs go into effect for by Feb 1?', outcomePrices: '0.38,0.62', volume: '90000', slug: 'trump-greenland-tariffs-countries', endDate: '2026-02-01', category: 'Trump', topOutcome: 'Denmark 38%' },
-      
-      // Venezuela
-      { id: 'trump-14', question: 'María Corina Machado enters Venezuela by March 31?', outcomePrices: '0.37,0.63', volume: '3000000', slug: 'machado-enters-venezuela', endDate: '2026-03-31', category: 'Trump' },
-      { id: 'trump-15', question: 'U.S. recognizes Machado as leader of Venezuela by January 31?', outcomePrices: '0.01,0.99', volume: '1000000', slug: 'us-recognizes-machado', endDate: '2026-01-31', category: 'Trump' },
-      { id: 'trump-16', question: 'US forces in Venezuela again by June 30, 2026?', outcomePrices: '0.26,0.74', volume: '2500000', slug: 'us-forces-venezuela', endDate: '2026-06-30', category: 'Trump' },
-      
-      // Iran & Middle East
-      { id: 'trump-17', question: 'Will the Iranian regime fall before 2027?', outcomePrices: '0.36,0.64', volume: '3000000', slug: 'iranian-regime-fall-2027', endDate: '2027-01-01', category: 'Trump' },
-      { id: 'trump-18', question: 'Will the US officially declare war on Iran by December 31, 2026?', outcomePrices: '0.14,0.86', volume: '1500000', slug: 'us-declare-war-iran', endDate: '2026-12-31', category: 'Trump' },
-      
-      // Cabinet & Administration  
-      { id: 'trump-19', question: 'Who will be the first to leave the Trump Cabinet?', outcomePrices: '0.29,0.71', volume: '1000000', slug: 'first-leave-trump-cabinet', endDate: '2026-12-31', category: 'Trump', topOutcome: 'Pam Bondi 29%' },
-      { id: 'trump-20', question: 'Jerome Powell out as Fed Chair by March 31?', outcomePrices: '0.05,0.95', volume: '545000', slug: 'jerome-powell-out-march', endDate: '2026-03-31', category: 'Trump' },
-      { id: 'trump-21', question: 'Jerome Powell out as Fed Chair by May 14?', outcomePrices: '0.09,0.91', volume: '545000', slug: 'jerome-powell-out-may', endDate: '2026-05-14', category: 'Trump' },
-      { id: 'trump-22', question: 'Will J.D. Vance be the first to leave the Trump Cabinet before 2027?', outcomePrices: '0.01,0.99', volume: '200000', slug: 'jd-vance-leave-cabinet', endDate: '2027-01-01', category: 'Trump' },
-      
-      // Military & Security
-      { id: 'trump-23', question: 'Next Country US Strikes', outcomePrices: '0.68,0.32', volume: '701000', slug: 'next-country-us-strikes', endDate: '2026-06-30', category: 'Trump', topOutcome: 'Somalia 68%' },
-      { id: 'trump-24', question: 'U.S. strike on Somalia by January 31?', outcomePrices: '0.73,0.27', volume: '252000', slug: 'us-strike-somalia', endDate: '2026-01-31', category: 'Trump' },
-      { id: 'trump-25', question: 'Insurrection Act invoked by January 31?', outcomePrices: '0.14,0.86', volume: '312000', slug: 'insurrection-act-jan', endDate: '2026-01-31', category: 'Trump' },
-      { id: 'trump-26', question: 'Insurrection Act invoked by March 31?', outcomePrices: '0.32,0.68', volume: '312000', slug: 'insurrection-act-march', endDate: '2026-03-31', category: 'Trump' },
-      
-      // Immigration & Deportation
-      { id: 'trump-27', question: 'Will Trump deport 750,000 or more people in 2025?', outcomePrices: '0.04,0.96', volume: '396000', slug: 'trump-deport-750k', endDate: '2025-12-31', category: 'Trump' },
-      { id: 'trump-28', question: 'Will Trump deport less than 250,000?', outcomePrices: '0.02,0.98', volume: '396000', slug: 'trump-deport-less-250k', endDate: '2025-12-31', category: 'Trump' },
-      { id: 'trump-29', question: 'Trump suspends U.S. entry for more countries by June 30?', outcomePrices: '0.49,0.51', volume: '250000', slug: 'trump-entry-ban', endDate: '2026-06-30', category: 'Trump' },
-      
-      // Impeachment & Approval
-      { id: 'trump-30', question: 'Trump impeached by end of 2026?', outcomePrices: '0.13,0.87', volume: '246000', slug: 'trump-impeached-2026', endDate: '2026-12-31', category: 'Trump' },
-      { id: 'trump-31', question: 'Will Trump resign by December 31, 2026?', outcomePrices: '0.07,0.93', volume: '150000', slug: 'trump-resign-2026', endDate: '2026-12-31', category: 'Trump' },
-      { id: 'trump-32', question: 'Will Trump\'s approval rating hit 44% in 2026?', outcomePrices: '0.37,0.63', volume: '200000', slug: 'trump-approval-44', endDate: '2026-12-31', category: 'Trump' },
-      
-      // DOGE & Budget
-      { id: 'trump-33', question: 'Will Elon cut the budget by at least 5% in 2025?', outcomePrices: '0.01,0.99', volume: '500000', slug: 'elon-cut-budget-5', endDate: '2025-12-31', category: 'Trump' },
-      
-      // Foreign Policy
-      { id: 'trump-34', question: 'Russia x Ukraine ceasefire by March 31, 2026?', outcomePrices: '0.12,0.88', volume: '3000000', slug: 'russia-ukraine-ceasefire', endDate: '2026-03-31', category: 'Trump' },
-      { id: 'trump-35', question: 'Will Trump and Putin meet next in Belarus?', outcomePrices: '0.25,0.75', volume: '150000', slug: 'trump-putin-belarus', endDate: '2026-06-30', category: 'Trump' },
-      { id: 'trump-36', question: 'Will Trump recognize Somaliland before 2027?', outcomePrices: '0.36,0.64', volume: '58600', slug: 'trump-recognize-somaliland', endDate: '2027-01-01', category: 'Trump' },
-    ];
-
-    const OTHER_MARKETS = [
-      // Ukraine/Russia conflict
-      { id: '1', question: 'Will Russia capture Pokrovsk by March 2026?', outcomePrices: '0.35,0.65', volume: '2700000', slug: 'russia-capture-pokrovsk', endDate: '2026-03-31', category: 'Conflict' },
-      { id: '2', question: 'Will there be a Ukraine ceasefire in 2026?', outcomePrices: '0.42,0.58', volume: '8500000', slug: 'ukraine-ceasefire-2026', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '3', question: 'Will Putin remain President through 2026?', outcomePrices: '0.92,0.08', volume: '2800000', slug: 'putin-president-2026', endDate: '2026-12-31', category: 'Politics' },
-      { id: '4', question: 'Will Russia mobilize 500k+ troops in 2026?', outcomePrices: '0.28,0.72', volume: '890000', slug: 'russia-mobilization', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '5', question: 'Will Ukraine retake Crimea by 2027?', outcomePrices: '0.05,0.95', volume: '1200000', slug: 'ukraine-crimea', endDate: '2027-12-31', category: 'Conflict' },
-      { id: '6', question: 'Will Zelensky win Nobel Peace Prize?', outcomePrices: '0.18,0.82', volume: '420000', slug: 'zelensky-nobel', endDate: '2026-10-15', category: 'Politics' },
-      { id: '7', question: 'Will Germany send Taurus missiles to Ukraine?', outcomePrices: '0.32,0.68', volume: '920000', slug: 'germany-taurus', endDate: '2026-06-30', category: 'Conflict' },
-      
-      // Asia Pacific
-      { id: '8', question: 'Will China invade Taiwan by 2027?', outcomePrices: '0.08,0.92', volume: '4200000', slug: 'china-taiwan-invasion', endDate: '2027-12-31', category: 'Conflict' },
-      { id: '9', question: 'Will North Korea test nuclear weapon in 2026?', outcomePrices: '0.45,0.55', volume: '1200000', slug: 'north-korea-nuclear-test', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '10', question: 'Will Japan increase military spending by 50%?', outcomePrices: '0.68,0.32', volume: '520000', slug: 'japan-military-spending', endDate: '2026-12-31', category: 'Politics' },
-      { id: '11', question: 'Will China-Taiwan military incident occur in 2026?', outcomePrices: '0.35,0.65', volume: '1800000', slug: 'china-taiwan-incident', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '12', question: 'Will South Korea develop nuclear weapons?', outcomePrices: '0.12,0.88', volume: '650000', slug: 'south-korea-nuclear', endDate: '2027-12-31', category: 'Conflict' },
-      { id: '13', question: 'Will Philippines clash with China in South China Sea?', outcomePrices: '0.55,0.45', volume: '480000', slug: 'philippines-china-scs', endDate: '2026-12-31', category: 'Conflict' },
-      
-      // Middle East
-      { id: '14', question: 'Will Israel strike Iran nuclear facilities in 2026?', outcomePrices: '0.28,0.72', volume: '3100000', slug: 'israel-iran-strike', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '15', question: 'Will Houthi attacks on Red Sea shipping continue?', outcomePrices: '0.78,0.22', volume: '890000', slug: 'houthi-red-sea', endDate: '2026-06-30', category: 'Conflict' },
-      { id: '16', question: 'Will Saudi Arabia normalize relations with Israel?', outcomePrices: '0.25,0.75', volume: '1500000', slug: 'saudi-israel-normalization', endDate: '2026-12-31', category: 'Politics' },
-      { id: '17', question: 'Will Syria hold free elections by 2027?', outcomePrices: '0.38,0.62', volume: '680000', slug: 'syria-elections', endDate: '2027-12-31', category: 'Politics' },
-      { id: '18', question: 'Will Gaza ceasefire hold through 2026?', outcomePrices: '0.45,0.55', volume: '2100000', slug: 'gaza-ceasefire', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '19', question: 'Will Netanyahu remain PM through 2026?', outcomePrices: '0.72,0.28', volume: '980000', slug: 'netanyahu-pm', endDate: '2026-12-31', category: 'Politics' },
-      { id: '20', question: 'Will Iran develop nuclear weapon by 2027?', outcomePrices: '0.22,0.78', volume: '1650000', slug: 'iran-nuclear-weapon', endDate: '2027-12-31', category: 'Conflict' },
-      { id: '21', question: 'Will Lebanon form new government in 2026?', outcomePrices: '0.58,0.42', volume: '320000', slug: 'lebanon-government', endDate: '2026-12-31', category: 'Politics' },
-      
-      // US Politics
-      { id: '22', question: 'Will Trump impose new tariffs on China?', outcomePrices: '0.85,0.15', volume: '5600000', slug: 'trump-china-tariffs', endDate: '2026-06-30', category: 'Trade' },
-      { id: '23', question: 'Will US enter recession in 2026?', outcomePrices: '0.32,0.68', volume: '3200000', slug: 'us-recession-2026', endDate: '2026-12-31', category: 'Economy' },
-      { id: '24', question: 'Will Fed cut rates below 3% in 2026?', outcomePrices: '0.48,0.52', volume: '2100000', slug: 'fed-rates-2026', endDate: '2026-12-31', category: 'Economy' },
-      { id: '25', question: 'Will US withdraw from NATO?', outcomePrices: '0.08,0.92', volume: '1800000', slug: 'us-nato-withdrawal', endDate: '2027-12-31', category: 'Politics' },
-      { id: '26', question: 'Will Trump pardon January 6 defendants?', outcomePrices: '0.88,0.12', volume: '950000', slug: 'trump-j6-pardons', endDate: '2026-03-31', category: 'Politics' },
-      { id: '27', question: 'Will US impose tariffs on EU?', outcomePrices: '0.62,0.38', volume: '780000', slug: 'us-eu-tariffs', endDate: '2026-12-31', category: 'Trade' },
-      
-      // Europe
-      { id: '28', question: 'Will UK rejoin EU single market by 2030?', outcomePrices: '0.12,0.88', volume: '650000', slug: 'uk-eu-single-market', endDate: '2030-12-31', category: 'Politics' },
-      { id: '29', question: 'Will Macron complete his presidential term?', outcomePrices: '0.88,0.12', volume: '450000', slug: 'macron-term', endDate: '2027-05-13', category: 'Politics' },
-      { id: '30', question: 'Will NATO expand to include new members by 2027?', outcomePrices: '0.55,0.45', volume: '780000', slug: 'nato-expansion', endDate: '2027-12-31', category: 'Politics' },
-      { id: '31', question: 'Will Germany elections lead to AfD coalition?', outcomePrices: '0.18,0.82', volume: '520000', slug: 'germany-afd', endDate: '2026-12-31', category: 'Politics' },
-      { id: '32', question: 'Will EU impose sanctions on Hungary?', outcomePrices: '0.42,0.58', volume: '380000', slug: 'eu-hungary-sanctions', endDate: '2026-12-31', category: 'Politics' },
-      { id: '33', question: 'Will Scotland hold independence referendum?', outcomePrices: '0.15,0.85', volume: '290000', slug: 'scotland-referendum', endDate: '2027-12-31', category: 'Politics' },
-      
-      // Latin America
-      { id: '34', question: 'Will Venezuela have regime change by 2027?', outcomePrices: '0.22,0.78', volume: '340000', slug: 'venezuela-regime-change', endDate: '2027-12-31', category: 'Politics' },
-      { id: '35', question: 'Will Brazil host emergency climate summit?', outcomePrices: '0.62,0.38', volume: '280000', slug: 'brazil-climate-summit', endDate: '2026-12-31', category: 'Politics' },
-      { id: '36', question: 'Will Mexico negotiate new trade deal with USA?', outcomePrices: '0.71,0.29', volume: '410000', slug: 'mexico-usa-trade', endDate: '2026-12-31', category: 'Trade' },
-      { id: '37', question: 'Will Argentina dollarize its economy?', outcomePrices: '0.35,0.65', volume: '580000', slug: 'argentina-dollarize', endDate: '2026-12-31', category: 'Economy' },
-      { id: '38', question: 'Will Colombia peace deal collapse?', outcomePrices: '0.28,0.72', volume: '220000', slug: 'colombia-peace', endDate: '2026-12-31', category: 'Conflict' },
-      
-      // South Asia
-      { id: '39', question: 'Will India-Pakistan have military conflict in 2026?', outcomePrices: '0.15,0.85', volume: '980000', slug: 'india-pakistan-conflict', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '40', question: 'Will India GDP growth exceed 7% in 2026?', outcomePrices: '0.72,0.28', volume: '450000', slug: 'india-gdp-2026', endDate: '2026-12-31', category: 'Economy' },
-      { id: '41', question: 'Will Bangladesh political crisis continue?', outcomePrices: '0.55,0.45', volume: '180000', slug: 'bangladesh-crisis', endDate: '2026-12-31', category: 'Politics' },
-      { id: '42', question: 'Will Myanmar civil war end by 2027?', outcomePrices: '0.18,0.82', volume: '240000', slug: 'myanmar-civil-war', endDate: '2027-12-31', category: 'Conflict' },
-      
-      // Africa
-      { id: '43', question: 'Will Sudan conflict spread to neighbors?', outcomePrices: '0.42,0.58', volume: '320000', slug: 'sudan-conflict-spread', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '44', question: 'Will South Africa load shedding end?', outcomePrices: '0.25,0.75', volume: '280000', slug: 'south-africa-power', endDate: '2026-12-31', category: 'Economy' },
-      { id: '45', question: 'Will Niger rejoin ECOWAS?', outcomePrices: '0.32,0.68', volume: '150000', slug: 'niger-ecowas', endDate: '2026-12-31', category: 'Politics' },
-      { id: '46', question: 'Will Ethiopia-Egypt tensions escalate over Nile?', outcomePrices: '0.38,0.62', volume: '420000', slug: 'ethiopia-egypt-nile', endDate: '2026-12-31', category: 'Conflict' },
-      
-      // Global/Economic
-      { id: '47', question: 'Will Bitcoin reach $200k in 2026?', outcomePrices: '0.22,0.78', volume: '4500000', slug: 'bitcoin-200k', endDate: '2026-12-31', category: 'Economy' },
-      { id: '48', question: 'Will oil prices exceed $100/barrel?', outcomePrices: '0.38,0.62', volume: '2100000', slug: 'oil-100-barrel', endDate: '2026-12-31', category: 'Economy' },
-      { id: '49', question: 'Will global temperature record be broken in 2026?', outcomePrices: '0.75,0.25', volume: '650000', slug: 'temperature-record-2026', endDate: '2026-12-31', category: 'Climate' },
-      { id: '50', question: 'Will major cyberattack disrupt global infrastructure?', outcomePrices: '0.45,0.55', volume: '890000', slug: 'cyberattack-infrastructure', endDate: '2026-12-31', category: 'Security' },
-      { id: '51', question: 'Will China overtake US in AI capabilities?', outcomePrices: '0.28,0.72', volume: '1200000', slug: 'china-us-ai', endDate: '2027-12-31', category: 'Technology' },
-      { id: '52', question: 'Will BRICS launch new reserve currency?', outcomePrices: '0.18,0.82', volume: '780000', slug: 'brics-currency', endDate: '2026-12-31', category: 'Economy' },
-      
-      // More conflicts
-      { id: '53', question: 'Will Turkey invade northern Syria again?', outcomePrices: '0.42,0.58', volume: '520000', slug: 'turkey-syria-invasion', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '54', question: 'Will Azerbaijan-Armenia conflict restart?', outcomePrices: '0.35,0.65', volume: '380000', slug: 'azerbaijan-armenia', endDate: '2026-12-31', category: 'Conflict' },
-      { id: '55', question: 'Will Serbia-Kosovo tensions escalate to conflict?', outcomePrices: '0.22,0.78', volume: '290000', slug: 'serbia-kosovo', endDate: '2026-12-31', category: 'Conflict' },
-    ];
-
-    // Combine: Trump markets first (prioritized), then other markets
-    const SAMPLE_MARKETS = [...TRUMP_MARKETS, ...OTHER_MARKETS];
-
-    // ==================== NEWS/OSINT DATA ====================
-    const SAMPLE_NEWS = [
-      { id: 1, source: 'OSINT Aggregator', text: 'Heavy artillery exchanges reported near Pokrovsk front lines. Ukrainian forces reinforcing positions.', time: '12m ago', lat: 48.28, lng: 37.18, location: 'Pokrovsk, Ukraine' },
-      { id: 2, source: 'Conflict Monitor', text: 'Red Sea shipping traffic down 40% as Houthi drone attacks continue. US Navy conducting operations.', time: '28m ago', lat: 15.37, lng: 44.19, location: 'Red Sea' },
-      { id: 3, source: 'Intel Report', text: 'Taiwan Strait: Increased PLA Air Force activity detected. 12 aircraft crossed median line.', time: '45m ago', lat: 24.50, lng: 120.50, location: 'Taiwan Strait' },
-      { id: 4, source: 'Diplomatic Wire', text: 'Emergency UN Security Council session called regarding escalating Middle East tensions.', time: '1h ago', lat: 40.75, lng: -73.97, location: 'New York, USA' },
-      { id: 5, source: 'OSINT Aggregator', text: 'Russian military convoy spotted moving toward Kharkiv region. Satellite imagery confirms.', time: '1h ago', lat: 49.99, lng: 36.23, location: 'Kharkiv, Ukraine' },
-      { id: 6, source: 'Market Intel', text: 'Oil futures spike 3% on Iran-Israel tensions. Brent crude approaching $85/barrel.', time: '2h ago', lat: 35.69, lng: 51.39, location: 'Tehran, Iran' },
-      { id: 7, source: 'Conflict Monitor', text: 'North Korean missile launch detected. Projectile landed in Sea of Japan/East Sea.', time: '2h ago', lat: 39.04, lng: 125.76, location: 'Pyongyang, DPRK' },
-      { id: 8, source: 'Intel Report', text: 'Syrian government forces clash with opposition in Idlib province. Casualties reported.', time: '3h ago', lat: 35.93, lng: 36.63, location: 'Idlib, Syria' },
-      { id: 9, source: 'Diplomatic Wire', text: 'EU emergency summit on Ukraine aid package. €50B discussion ongoing in Brussels.', time: '3h ago', lat: 50.85, lng: 4.35, location: 'Brussels, Belgium' },
-      { id: 10, source: 'OSINT Aggregator', text: 'Indian Army increases presence along Line of Actual Control amid China border tensions.', time: '4h ago', lat: 34.08, lng: 74.80, location: 'Kashmir' },
-    ];
-
-    // ==================== HELPER FUNCTIONS ====================
-    function getLocation(market) {
-      // Trump markets always center around Washington DC with spread
-      if (market.category === 'Trump') {
-        return {
-          lat: 38.9 + (Math.random() - 0.5) * 3,
-          lng: -77.0 + (Math.random() - 0.5) * 6,
-          country: 'USA',
-          region: 'Americas'
-        };
+      for (const feedUrl of API.NEWS.FEEDS) {
+        try {
+          const res = await fetch(API.NEWS.RSS_PROXY + encodeURIComponent(feedUrl), {
+            signal: AbortSignal.timeout(8000)
+          });
+          
+          if (!res.ok) continue;
+          const data = await res.json();
+          
+          if (data.items) {
+            data.items.slice(0, 5).forEach(item => {
+              allNews.push({
+                id: `news-${Date.now()}-${Math.random()}`,
+                title: item.title?.replace(/<[^>]+>/g, '') || '',
+                source: data.feed?.title || 'News',
+                url: item.link,
+                time: new Date(item.pubDate),
+                isBreaking: Date.now() - new Date(item.pubDate).getTime() < 3600000, // < 1 hour
+              });
+            });
+          }
+        } catch (e) {
+          console.log('News feed failed:', e.message);
+        }
       }
       
-      const text = `${market.question || ''} ${market.title || ''} ${market.description || ''}`.toLowerCase();
+      return allNews
+        .sort((a, b) => b.time - a.time)
+        .slice(0, 20);
+    }
+    
+    // Get location from market question
+    function getMarketLocation(question) {
+      const q = question.toLowerCase();
+      
       for (const [keyword, loc] of Object.entries(LOCATIONS)) {
-        if (text.includes(keyword.toLowerCase())) {
+        if (q.includes(keyword)) {
           return {
             ...loc,
-            lat: loc.lat + (Math.random() - 0.5) * 1.2,
-            lng: loc.lng + (Math.random() - 0.5) * 1.2,
+            lat: loc.lat + (Math.random() - 0.5) * 2,
+            lng: loc.lng + (Math.random() - 0.5) * 2,
           };
         }
       }
       return null;
     }
-
-    const formatProb = (p) => `${(parseFloat(p) * 100).toFixed(0)}%`;
-    const formatVol = (v) => {
-      const n = parseFloat(v);
-      if (n >= 1e6) return `$${(n / 1e6).toFixed(1)}M`;
-      if (n >= 1e3) return `$${(n / 1e3).toFixed(0)}K`;
-      return `$${n.toFixed(0)}`;
+    
+    // Determine category
+    function getCategory(question) {
+      const q = question.toLowerCase();
+      if (q.includes('trump') || q.includes('maga') || q.includes('republican')) return 'Trump';
+      if (q.includes('war') || q.includes('military') || q.includes('conflict') || q.includes('strike')) return 'Conflict';
+      if (q.includes('bitcoin') || q.includes('crypto') || q.includes('fed') || q.includes('economy') || q.includes('recession')) return 'Economy';
+      if (q.includes('tariff') || q.includes('trade') || q.includes('sanction')) return 'Trade';
+      return 'Politics';
+    }
+    
+    // Format helpers
+    const formatProb = (p) => `${Math.round(p * 100)}%`;
+    const formatVolume = (v) => {
+      if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
+      if (v >= 1e3) return `$${(v / 1e3).toFixed(0)}K`;
+      return `$${v.toFixed(0)}`;
+    };
+    const formatTime = (date) => {
+      const diff = Date.now() - new Date(date).getTime();
+      const mins = Math.floor(diff / 60000);
+      const hours = Math.floor(mins / 60);
+      if (hours > 0) return `${hours}h ago`;
+      if (mins > 0) return `${mins}m ago`;
+      return 'Just now';
     };
 
-    // ==================== MAIN COMPONENT ====================
-    function ConnecTHOR() {
-      const globeEl = useRef();
-      const [markets, setMarkets] = useState([]);
-      const [news, setNews] = useState(SAMPLE_NEWS);
-      const [selected, setSelected] = useState(null);
-      const [loading, setLoading] = useState(true);
-      const [search, setSearch] = useState('');
-      const [showOSINT, setShowOSINT] = useState(true);
-      const [showBorders, setShowBorders] = useState(true);
-      const [liveLoading, setLiveLoading] = useState(false);
-      const [category, setCategory] = useState('Trump');
-      const [countries, setCountries] = useState({ features: [] });
-      const [isOnline, setIsOnline] = useState(false);
-      const [lastUpdate, setLastUpdate] = useState(new Date());
-      const [dataSource, setDataSource] = useState('sample'); // 'sample' or 'live'
-      const [highlightedMarket, setHighlightedMarket] = useState(null);
-
-      // Periodic market highlight animation
-      useEffect(() => {
-        const highlightInterval = setInterval(() => {
-          if (markets.length > 0) {
-            // Pick a random high-volume market to highlight
-            const candidates = markets.filter(m => parseFloat(m.volume) > 1000000);
-            if (candidates.length > 0) {
-              const randomMarket = candidates[Math.floor(Math.random() * candidates.length)];
-              setHighlightedMarket(randomMarket);
-              // Clear highlight after 7 seconds
-              setTimeout(() => setHighlightedMarket(null), 7000);
-            }
-          }
-        }, 15000); // Every 15 seconds
-        
-        return () => clearInterval(highlightInterval);
-      }, [markets]);
-
-      // Process markets (either sample or live)
-      const processMarkets = (rawMarkets) => {
-        return rawMarkets
-          .map(m => {
-            const loc = getLocation(m);
-            if (!loc) return null;
-            const prices = m.outcomePrices?.split(',') || ['0.5', '0.5'];
-            const yesPrice = parseFloat(prices[0]);
-            return {
-              ...m,
-              ...loc,
-              yesPrice,
-              noPrice: 1 - yesPrice,
-              probability: formatProb(prices[0]),
-              formattedVolume: formatVol(m.volume),
-            };
-          })
-          .filter(Boolean);
-      };
-
-      // Fetch live data from Polymarket API
-      const fetchLiveData = async () => {
-        setLiveLoading(true);
-        try {
-          const liveMarkets = await fetchLiveMarkets();
-          
-          if (liveMarkets && liveMarkets.length > 0) {
-            const processed = processMarkets(liveMarkets);
-            if (processed.length > 0) {
-              setMarkets(processed);
-              setDataSource('live');
-              setIsOnline(true);
-              setLastUpdate(new Date());
-              console.log(`Loaded ${processed.length} live markets`);
-            }
-          } else {
-            // Fallback to sample data
-            console.log('Using sample data (API unavailable)');
-            const processed = processMarkets(SAMPLE_MARKETS);
-            setMarkets(processed);
-            setDataSource('sample');
-          }
-        } catch (err) {
-          console.error('Error fetching live data:', err);
-          // Fallback to sample
-          const processed = processMarkets(SAMPLE_MARKETS);
-          setMarkets(processed);
-          setDataSource('sample');
-        }
-        setLiveLoading(false);
-      };
-
-      // Initial load - try live API first
-      useEffect(() => {
-        const init = async () => {
-          // First, try live API
-          const liveMarkets = await fetchLiveMarkets();
-          
-          if (liveMarkets && liveMarkets.length > 0) {
-            const processed = processMarkets(liveMarkets);
-            if (processed.length > 0) {
-              setMarkets(processed);
-              setDataSource('live');
-              setIsOnline(true);
-              setLastUpdate(new Date());
-            } else {
-              // No geolocatable markets, use sample
-              setMarkets(processMarkets(SAMPLE_MARKETS));
-              setDataSource('sample');
-            }
-          } else {
-            // API failed, use sample data
-            setMarkets(processMarkets(SAMPLE_MARKETS));
-            setDataSource('sample');
-          }
-          
-          setLoading(false);
-        };
-        
-        init();
-        
-        // Auto-refresh every 60 seconds if live
-        const refreshInterval = setInterval(() => {
-          if (dataSource === 'live') {
-            fetchLiveData();
-          }
-        }, 60000);
-        
-        return () => clearInterval(refreshInterval);
-      }, []);
-      const [feedLoading, setFeedLoading] = useState(false);
-      // Load Twitter embed widget (optional enhancement - fallback content shown if blocked)
-      useEffect(() => {
-        const loadTwitterWidget = () => {
-          if (window.twttr?.widgets) {
-            window.twttr.widgets.load();
-          }
-        };
-        
-        // Try immediately
-        loadTwitterWidget();
-        
-        // Retry after a delay in case script loads late
-        const timer = setTimeout(loadTwitterWidget, 2000);
-        
-        return () => clearTimeout(timer);
-      }, []);
-
-      // Fetch Twitter/X OSINT feeds
-      const refreshOsintFeed = async () => {
-        setFeedLoading(true);
-        try {
-          let liveFeed = [];
-          
-          // Option 1: Try Cloudflare Worker if configured
-          if (CONFIG.TWITTER_WORKER) {
-            try {
-              const res = await fetch(CONFIG.TWITTER_WORKER);
-              const data = await res.json();
-              if (data.status === 'ok' && data.items) {
-                liveFeed = data.items;
-              }
-            } catch (e) {
-              console.log('Worker unavailable, falling back to RSS...');
-            }
-          }
-          
-          // Option 2: Fallback to Nitter RSS
-          if (liveFeed.length === 0) {
-            liveFeed = await fetchAllOsintFeeds();
-          }
-          
-          if (liveFeed.length > 0) {
-            setNews(liveFeed);
-            setLastUpdate(new Date());
-            setIsOnline(true);
-          }
-        } catch (err) {
-          console.error('OSINT feed error:', err);
-        }
-        setFeedLoading(false);
-      };
-
-      // Auto-fetch feeds on mount and every 2 minutes
-      useEffect(() => {
-        // Initial fetch after 1 second
-        const initialTimer = setTimeout(() => {
-          refreshOsintFeed();
-        }, 1000);
-        
-        // Refresh every 2 minutes
-        const refreshInterval = setInterval(() => {
-          refreshOsintFeed();
-        }, 120000);
-        
-        return () => {
-          clearTimeout(initialTimer);
-          clearInterval(refreshInterval);
-        };
-      }, []);
-
-      // Globe texture URLs
-      const GLOBE_TEXTURES = {
-        earth: 'https://unpkg.com/three-globe@2.31.1/example/img/earth-blue-marble.jpg',
-        bump: 'https://unpkg.com/three-globe@2.31.1/example/img/earth-topology.png',
-        sky: 'https://unpkg.com/three-globe@2.31.1/example/img/night-sky.png',
-      };
-
-      // Load country borders lazily (after initial render)
-      useEffect(() => {
-        // Delay border loading to not block initial render
-        const timer = setTimeout(() => {
-          fetch(CONFIG.COUNTRIES_GEOJSON)
-            .then(res => res.json())
-            .then(data => setCountries(data))
-            .catch(err => console.log('Borders unavailable:', err));
-        }, 2000);
-        return () => clearTimeout(timer);
-      }, []);
-
-      // Globe setup
-      useEffect(() => {
-        if (globeEl.current && !loading) {
-          globeEl.current.controls().autoRotate = true;
-          globeEl.current.controls().autoRotateSpeed = 0.3;
-          globeEl.current.pointOfView({ lat: 30, lng: 20, altitude: 2.0 }, 1500);
-        }
-      }, [loading]);
-
-      // Focus on selected
-      useEffect(() => {
-        if (globeEl.current && selected) {
-          globeEl.current.controls().autoRotate = false;
-          globeEl.current.pointOfView({ lat: selected.lat, lng: selected.lng, altitude: 1.5 }, 800);
-        }
-      }, [selected]);
+    // ==================== GLOBE ANIMATION GENERATORS ====================
+    
+    function generateArcs(markets) {
+      const dcLat = 38.9, dcLng = -77;
+      return markets
+        .filter(m => m.volume > 500000 && m.lat && Math.abs(m.lat - dcLat) > 5)
+        .slice(0, 12)
+        .map((m, i) => ({
+          startLat: dcLat,
+          startLng: dcLng,
+          endLat: m.lat,
+          endLng: m.lng,
+          color: m.category === 'Trump' ? ['rgba(239,68,68,0.8)', 'rgba(239,68,68,0.2)'] :
+                 m.category === 'Conflict' ? ['rgba(249,115,22,0.8)', 'rgba(249,115,22,0.2)'] :
+                 ['rgba(59,130,246,0.8)', 'rgba(139,92,246,0.2)'],
+          stroke: 0.8 + Math.min(m.volume / 10000000, 1.5),
+          dashLength: 0.4,
+          dashGap: 0.2,
+          dashAnimateTime: 1500 + (i % 5) * 300,
+          altitude: 0.12 + (i % 3) * 0.06,
+        }));
+    }
+    
+    function generateRings(markets, highlighted) {
+      const rings = markets
+        .filter(m => (m.volume > 1000000 || m.category === 'Trump') && m.lat)
+        .slice(0, 15)
+        .map((m, i) => ({
+          lat: m.lat,
+          lng: m.lng,
+          maxR: m.category === 'Trump' ? 3.5 : 2,
+          propagationSpeed: 1.5 + (i % 3) * 0.5,
+          repeatPeriod: 1200 + (i % 4) * 300,
+          color: m.probability > 0.7 ? 'rgba(34,197,94,0.5)' :
+                 m.probability < 0.3 ? 'rgba(239,68,68,0.5)' :
+                 'rgba(245,158,11,0.5)',
+        }));
       
-      // Gently pan towards highlighted market
+      // Add highlight ring
+      if (highlighted?.lat) {
+        rings.unshift({
+          lat: highlighted.lat,
+          lng: highlighted.lng,
+          maxR: 5,
+          propagationSpeed: 3,
+          repeatPeriod: 800,
+          color: 'rgba(255,255,255,0.7)',
+        });
+      }
+      
+      return rings;
+    }
+
+    // ==================== SIMULATED ACTIVITY GENERATOR ====================
+    
+    function generateActivity(markets) {
+      if (markets.length === 0) return [];
+      
+      const activities = [];
+      const actions = ['BUY', 'SELL'];
+      const amounts = [500, 1000, 2500, 5000, 10000, 25000];
+      
+      for (let i = 0; i < 10; i++) {
+        const market = markets[Math.floor(Math.random() * Math.min(markets.length, 20))];
+        const action = actions[Math.floor(Math.random() * 2)];
+        const amount = amounts[Math.floor(Math.random() * amounts.length)];
+        const isWhale = amount >= 10000;
+        
+        activities.push({
+          id: `activity-${Date.now()}-${i}`,
+          market: market.question.substring(0, 40) + '...',
+          action,
+          amount,
+          isWhale,
+          time: new Date(Date.now() - Math.random() * 300000), // Last 5 mins
+          source: market.source,
+        });
+      }
+      
+      return activities.sort((a, b) => b.time - a.time);
+    }
+
+    // ==================== MAIN APP COMPONENT ====================
+    
+    function ConnecTHORApp() {
+      const globeEl = useRef();
+      
+      // Data states
+      const [markets, setMarkets] = useState([]);
+      const [news, setNews] = useState([]);
+      const [activities, setActivities] = useState([]);
+      const [loading, setLoading] = useState(true);
+      const [loadingText, setLoadingText] = useState('Initializing...');
+      
+      // UI states
+      const [selectedMarket, setSelectedMarket] = useState(null);
+      const [highlightedMarket, setHighlightedMarket] = useState(null);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [selectedSource, setSelectedSource] = useState('all');
+      const [selectedCategory, setSelectedCategory] = useState('All');
+      const [activityTab, setActivityTab] = useState('activity');
+      const [countries, setCountries] = useState({ features: [] });
+      
+      // Connection states
+      const [isConnected, setIsConnected] = useState(false);
+      const [lastUpdate, setLastUpdate] = useState(null);
+      
+      // Load all data
       useEffect(() => {
-        if (globeEl.current && highlightedMarket && !selected) {
-          // Only pan if user hasn't manually selected something
+        async function loadData() {
+          setLoadingText('Fetching Polymarket data...');
+          const polymarketData = await fetchPolymarket();
+          
+          setLoadingText('Fetching Manifold Markets...');
+          const manifoldData = await fetchManifold();
+          
+          setLoadingText('Processing markets...');
+          const allMarkets = [...polymarketData, ...manifoldData]
+            .map(m => {
+              const location = getMarketLocation(m.question);
+              if (!location) return null;
+              return {
+                ...m,
+                ...location,
+                category: getCategory(m.question),
+                probFormatted: formatProb(m.probability),
+                volumeFormatted: formatVolume(m.volume),
+              };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.volume - a.volume);
+          
+          setMarkets(allMarkets);
+          setActivities(generateActivity(allMarkets));
+          
+          setLoadingText('Fetching news...');
+          const newsData = await fetchNews();
+          setNews(newsData);
+          
+          setIsConnected(true);
+          setLastUpdate(new Date());
+          setLoading(false);
+        }
+        
+        loadData();
+        
+        // Load country borders
+        setTimeout(() => {
+          fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson')
+            .then(r => r.json())
+            .then(data => setCountries(data))
+            .catch(() => {});
+        }, 2000);
+      }, []);
+      
+      // Refresh data periodically
+      useEffect(() => {
+        if (loading) return;
+        
+        const interval = setInterval(async () => {
+          const polymarketData = await fetchPolymarket();
+          const manifoldData = await fetchManifold();
+          
+          const allMarkets = [...polymarketData, ...manifoldData]
+            .map(m => {
+              const location = getMarketLocation(m.question);
+              if (!location) return null;
+              return {
+                ...m,
+                ...location,
+                category: getCategory(m.question),
+                probFormatted: formatProb(m.probability),
+                volumeFormatted: formatVolume(m.volume),
+              };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.volume - a.volume);
+          
+          setMarkets(allMarkets);
+          setActivities(generateActivity(allMarkets));
+          setLastUpdate(new Date());
+        }, 60000); // Every minute
+        
+        return () => clearInterval(interval);
+      }, [loading]);
+      
+      // Spotlight rotation
+      useEffect(() => {
+        if (markets.length === 0) return;
+        
+        const interval = setInterval(() => {
+          const candidates = markets.filter(m => m.volume > 500000);
+          if (candidates.length > 0) {
+            const market = candidates[Math.floor(Math.random() * candidates.length)];
+            setHighlightedMarket(market);
+            setTimeout(() => setHighlightedMarket(null), 4000);
+          }
+        }, 8000);
+        
+        return () => clearInterval(interval);
+      }, [markets]);
+      
+      // Globe controls
+      useEffect(() => {
+        if (!globeEl.current || loading) return;
+        globeEl.current.controls().autoRotate = true;
+        globeEl.current.controls().autoRotateSpeed = 0.3;
+        globeEl.current.pointOfView({ lat: 30, lng: 0, altitude: 2.2 }, 1500);
+      }, [loading]);
+      
+      useEffect(() => {
+        if (!globeEl.current) return;
+        if (selectedMarket) {
+          globeEl.current.controls().autoRotate = false;
+          globeEl.current.pointOfView({ 
+            lat: selectedMarket.lat, 
+            lng: selectedMarket.lng, 
+            altitude: 1.5 
+          }, 800);
+        } else if (highlightedMarket) {
           globeEl.current.pointOfView({ 
             lat: highlightedMarket.lat, 
             lng: highlightedMarket.lng, 
-            altitude: 2.2 
-          }, 2000);
+            altitude: 2.0 
+          }, 1500);
         }
-      }, [highlightedMarket, selected]);
-
-      // Categories - Trump first
-      const categories = useMemo(() => {
-        const cats = new Set(markets.map(m => m.category).filter(Boolean));
-        // Ensure Trump is first, then All, then others
-        return ['Trump', 'All', ...Array.from(cats).filter(c => c !== 'Trump').sort()];
-      }, [markets]);
-
-      // Filter markets
-      const filtered = useMemo(() => {
-        let result = markets;
-        if (search) {
-          result = result.filter(m =>
-            m.question.toLowerCase().includes(search.toLowerCase()) ||
-            m.country?.toLowerCase().includes(search.toLowerCase()) ||
-            m.region?.toLowerCase().includes(search.toLowerCase())
-          );
-        }
-        if (category !== 'All') {
-          result = result.filter(m => m.category === category);
-        }
-        return result;
-      }, [markets, search, category]);
-
+      }, [selectedMarket, highlightedMarket]);
+      
+      // Filtered markets
+      const filteredMarkets = useMemo(() => {
+        return markets.filter(m => {
+          if (searchQuery && !m.question.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+          if (selectedSource !== 'all' && m.source !== selectedSource) return false;
+          if (selectedCategory !== 'All' && m.category !== selectedCategory) return false;
+          return true;
+        });
+      }, [markets, searchQuery, selectedSource, selectedCategory]);
+      
       // Stats
-      const totalVolume = useMemo(() => 
-        (filtered.reduce((s, m) => s + parseFloat(m.volume || 0), 0) / 1e6).toFixed(1)
-      , [filtered]);
+      const stats = useMemo(() => ({
+        totalMarkets: markets.length,
+        totalVolume: markets.reduce((s, m) => s + m.volume, 0),
+        polymarketCount: markets.filter(m => m.source === 'polymarket').length,
+        manifoldCount: markets.filter(m => m.source === 'manifold').length,
+      }), [markets]);
       
-      // Memoized animation data
-      const tradeArcs = useMemo(() => generateTradeArcs(filtered), [filtered]);
+      // Globe data
+      const arcs = useMemo(() => generateArcs(filteredMarkets), [filteredMarkets]);
+      const rings = useMemo(() => generateRings(filteredMarkets, highlightedMarket), [filteredMarkets, highlightedMarket]);
       
-      const pulseRings = useMemo(() => {
-        const baseRings = generatePulseRings(filtered);
-        if (highlightedMarket) {
-          baseRings.unshift({
-            lat: highlightedMarket.lat,
-            lng: highlightedMarket.lng,
-            maxR: 6,
-            propagationSpeed: 4,
-            repeatPeriod: 800,
-            color: 'rgba(255, 255, 255, 0.8)',
-            altitude: 0.02,
-          });
-        }
-        return baseRings;
-      }, [filtered, highlightedMarket]);
-
-      // Color helpers - Trump markets get special color
-      const getColor = useCallback((m) => {
-        // Trump markets are red-white-blue gradient effect (show as red)
-        if (m.category === 'Trump') return '#dc2626';
-        
-        if (m.yesPrice >= 0.7) return '#22c55e';
-        if (m.yesPrice >= 0.4) return '#eab308';
-        return '#ef4444';
-      }, []);
-
-      const getAltitude = useCallback((m) => {
-        const v = parseFloat(m.volume || 0);
-        if (v >= 3e6) return 0.18;
-        if (v >= 1e6) return 0.10;
-        return 0.05;
-      }, []);
-
-      const getProbClass = (prob) => {
-        if (prob >= 0.7) return 'high';
-        if (prob >= 0.4) return 'medium';
-        return 'low';
-      };
-
+      // News ticker content
+      const tickerContent = useMemo(() => {
+        const items = news.slice(0, 10).map(n => n.title);
+        return [...items, ...items]; // Duplicate for seamless scroll
+      }, [news]);
+      
+      // Categories
+      const categories = ['All', 'Trump', 'Politics', 'Conflict', 'Economy', 'Trade'];
+      
       if (loading) {
         return (
-          <div className="loading">
+          <div className="loading-screen">
             <div className="loading-icon">⚡</div>
-            <h2>ConnecTHOR</h2>
-            <p>Loading markets...</p>
+            <h2 style={{marginTop: 16, fontSize: 24, fontWeight: 800}}>ConnecTHOR</h2>
+            <p className="loading-text">{loadingText}</p>
+            <div className="loading-bar">
+              <div className="loading-progress"></div>
+            </div>
           </div>
         );
       }
-
+      
       return (
-        <>
+        <div className="app-container">
           {/* Header */}
-          <div className="header">
-            <div className="header-content">
-              <div className="logo">
-                <span className="logo-icon">⚡</span>
-                <div>
-                  <h1>ConnecTHOR</h1>
-                  <p>Real-Time Geopolitical Market Intelligence</p>
+          <header className="header">
+            <div className="logo">
+              <span className="logo-icon">⚡</span>
+              <div>
+                <h1>ConnecTHOR</h1>
+              </div>
+              <span className="logo-version">v2.0</span>
+            </div>
+            
+            <div className="header-stats">
+              <div className="header-stat">
+                <div className="header-stat-value">{stats.totalMarkets}</div>
+                <div className="header-stat-label">Markets</div>
+              </div>
+              <div className="header-stat">
+                <div className="header-stat-value">{formatVolume(stats.totalVolume)}</div>
+                <div className="header-stat-label">Volume</div>
+              </div>
+              <div className="header-stat">
+                <div className="header-stat-value live">
+                  <span className="live-dot"></span>
+                  LIVE
+                </div>
+                <div className="header-stat-label">
+                  {lastUpdate ? formatTime(lastUpdate) : 'Connecting...'}
                 </div>
               </div>
-              
-              <div className="controls">
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="Search markets, regions..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                
-                <button
-                  className={`btn btn-borders ${!showBorders ? 'inactive' : ''}`}
-                  onClick={() => setShowBorders(!showBorders)}
-                >
-                  🗺️ Borders
-                </button>
-                
-                <button
-                  className={`btn btn-osint ${!showOSINT ? 'inactive' : ''}`}
-                  onClick={() => setShowOSINT(!showOSINT)}
-                >
-                  🔴 OSINT
-                </button>
-                
-                <button 
-                  className={`btn btn-live ${liveLoading ? 'loading' : ''} ${dataSource === 'live' ? 'active' : ''}`}
-                  onClick={fetchLiveData}
-                  disabled={liveLoading}
-                  title={dataSource === 'live' ? `Live from Polymarket API - Updated ${lastUpdate.toLocaleTimeString()}` : 'Click to connect to Polymarket API'}
-                >
-                  <span className={`pulse-dot ${dataSource === 'live' ? 'live' : ''}`}></span>
-                  {liveLoading ? 'Connecting...' : dataSource === 'live' ? 'Live' : 'Go Live'}
-                </button>
-              </div>
             </div>
-          </div>
-
-          {/* Stats */}
-          <div className="stats-bar">
-            <div className="stat-card">
-              <div className="stat-label">{category === 'Trump' ? 'Trump Markets' : 'Active Markets'}</div>
-              <div className="stat-value">{filtered.length}</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">{category === 'Trump' ? 'Trump Volume' : 'Total Volume'}</div>
-              <div className="stat-value green">${totalVolume}M</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Data Source</div>
-              <div className="stat-value" style={{display: 'flex', alignItems: 'center', gap: '6px', color: dataSource === 'live' ? '#22c55e' : '#f59e0b'}}>
-                <span style={{
-                  width: '8px', 
-                  height: '8px', 
-                  background: dataSource === 'live' ? '#22c55e' : '#f59e0b', 
-                  borderRadius: '50%', 
-                  animation: dataSource === 'live' ? 'pulse 2s infinite' : 'none'
-                }}></span>
-                {dataSource === 'live' ? 'LIVE' : 'SAMPLE'}
-              </div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-label">Last Update</div>
-              <div className="stat-value blue" style={{fontSize: '0.85rem'}}>
-                {lastUpdate.toLocaleTimeString()}
-              </div>
-            </div>
-          </div>
-
-          {/* Unusual Whales Feed Panel */}
-          <div className="potus-panel">
-            <div className="potus-header" style={{background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.3), rgba(16, 185, 129, 0.2))'}}>
-              <a href="https://x.com/unusual_whales" target="_blank" rel="noopener noreferrer" style={{display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', flex: 1}}>
-                <div className="potus-avatar" style={{background: 'linear-gradient(135deg, #3b82f6, #10b981)'}}>🐋</div>
-                <div className="potus-title">
-                  <h3>
-                    @unusual_whales
-                    <span className="verified">✓</span>
-                  </h3>
-                  <p>Options Flow & Congress Trades</p>
-                </div>
-              </a>
-              <a 
-                href="https://x.com/unusual_whales" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="potus-refresh"
-                style={{textDecoration: 'none'}}
+            
+            <div className="header-controls">
+              <input
+                type="text"
+                className="search-box"
+                placeholder="Search markets..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <button 
+                className={`btn btn-live ${isConnected ? 'connected' : ''}`}
+                onClick={() => window.location.reload()}
               >
-                Live ↗
-              </a>
+                <span className="live-dot"></span>
+                {isConnected ? 'Connected' : 'Reconnect'}
+              </button>
             </div>
-            <div className="potus-content" style={{padding: 0}}>
-              {/* Twitter Timeline Embed - will replace content if it loads */}
-              <a 
-                className="twitter-timeline" 
-                data-theme="dark"
-                data-chrome="noheader nofooter noborders transparent"
-                data-height="250"
-                data-width="318"
-                data-dnt="true"
-                href="https://twitter.com/unusual_whales"
+          </header>
+          
+          {/* Left Panel - Markets */}
+          <aside className="left-panel">
+            <div className="panel-header">
+              <span className="panel-title">📊 Markets</span>
+              <span className="panel-badge">{filteredMarkets.length}</span>
+            </div>
+            
+            <div className="source-tabs">
+              <button 
+                className={`source-tab ${selectedSource === 'all' ? 'active' : ''}`}
+                onClick={() => setSelectedSource('all')}
               >
-                {/* Fallback content shown while loading or if blocked */}
-                <div style={{padding: '8px'}}>
-                  <div className="potus-tweet" style={{borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '8px'}}>
-                    <div className="potus-tweet-text">🔴 Large $SPY put sweep - $2.4M premium detected at the ask</div>
-                    <div className="potus-tweet-time">Sample • View live on X</div>
+                All
+              </button>
+              <button 
+                className={`source-tab polymarket ${selectedSource === 'polymarket' ? 'active' : ''}`}
+                onClick={() => setSelectedSource('polymarket')}
+              >
+                Polymarket ({stats.polymarketCount})
+              </button>
+              <button 
+                className={`source-tab manifold ${selectedSource === 'manifold' ? 'active' : ''}`}
+                onClick={() => setSelectedSource('manifold')}
+              >
+                Manifold ({stats.manifoldCount})
+              </button>
+            </div>
+            
+            <div className="category-tabs">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  className={`category-tab ${selectedCategory === cat ? 'active' : ''} ${cat === 'Trump' ? 'trump' : ''}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat === 'Trump' ? '🇺🇸 Trump' : cat}
+                </button>
+              ))}
+            </div>
+            
+            <div className="markets-list">
+              {filteredMarkets.slice(0, 30).map(market => (
+                <div
+                  key={market.id}
+                  className={`market-card ${selectedMarket?.id === market.id ? 'selected' : ''} ${market.category === 'Trump' ? 'trump' : ''}`}
+                  onClick={() => setSelectedMarket(market)}
+                >
+                  <div className={`market-source ${market.source}`}>
+                    {market.source === 'polymarket' ? '◆ Polymarket' : '◇ Manifold'}
                   </div>
-                  <div className="potus-tweet" style={{borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '8px'}}>
-                    <div className="potus-tweet-text">BREAKING: Congress member disclosed new $NVDA purchase worth $500K+</div>
-                    <div className="potus-tweet-time">Sample • View live on X</div>
-                  </div>
-                  <div className="potus-tweet" style={{borderBottom: '1px solid var(--border)', paddingBottom: '10px', marginBottom: '8px'}}>
-                    <div className="potus-tweet-text">⚠️ Unusual call activity in defense sector ahead of announcement</div>
-                    <div className="potus-tweet-time">Sample • View live on X</div>
-                  </div>
-                  <div style={{textAlign: 'center', padding: '12px'}}>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '8px 16px', 
-                      background: 'rgba(16, 185, 129, 0.15)', 
-                      borderRadius: '6px', 
-                      border: '1px solid rgba(16, 185, 129, 0.3)',
-                      color: '#34d399',
-                      fontSize: '12px'
-                    }}>
-                      Click for Live Feed →
+                  <div className="market-question">{market.question}</div>
+                  <div className="market-stats">
+                    <span className={`market-prob ${market.probability >= 0.7 ? 'high' : market.probability >= 0.4 ? 'medium' : 'low'}`}>
+                      {market.probFormatted}
                     </span>
+                    <span className="market-volume">{market.volumeFormatted}</span>
                   </div>
                 </div>
-              </a>
+              ))}
             </div>
-          </div>
-
-          {/* Market Spotlight Banner */}
-          {highlightedMarket && (
-            <div 
-              className="spotlight-banner"
-              onClick={() => setSelected(highlightedMarket)}
-              style={{cursor: 'pointer'}}
-              title="Click to view market details"
-            >
-              <div className="spotlight-pulse"></div>
-              <span className="spotlight-icon">⚡</span>
-              <span className="spotlight-label">SPOTLIGHT</span>
-              <span className="spotlight-text">
-                {highlightedMarket.question?.substring(0, 50)}...
-              </span>
-              <span className="spotlight-prob" style={{color: highlightedMarket.yesPrice > 0.6 ? '#22c55e' : highlightedMarket.yesPrice < 0.4 ? '#ef4444' : '#f59e0b'}}>
-                {highlightedMarket.probability}
-              </span>
-              <span style={{marginLeft: '12px', fontSize: '12px', color: '#60a5fa'}}>Click to view →</span>
-            </div>
-          )}
-
-          {/* Globe */}
-          <Globe
-            ref={globeEl}
-            globeImageUrl={GLOBE_TEXTURES.earth}
-            bumpImageUrl={GLOBE_TEXTURES.bump}
-            backgroundImageUrl={GLOBE_TEXTURES.sky}
-            animateIn={true}
-            
-            // Country borders
-            polygonsData={showBorders ? countries.features : []}
-            polygonCapColor={() => 'rgba(0, 0, 0, 0)'}
-            polygonSideColor={() => 'rgba(100, 150, 200, 0.05)'}
-            polygonStrokeColor={() => 'rgba(100, 180, 255, 0.35)'}
-            polygonAltitude={0.005}
-            
-            // Hex bin density visualization (disabled - may not be in all globe.gl versions)
-            // hexBinPointsData={showHexDensity ? filtered : []}
-            // hexBinPointLat="lat"
-            // hexBinPointLng="lng"
-            // hexBinPointWeight={d => Math.log10(Math.max(parseFloat(d.volume) || 1, 1))}
-            // hexBinResolution={3}
-            // hexAltitude={d => Math.min(d.sumWeight * 0.003, 0.15)}
-            // hexTopColor={d => `rgba(139, 92, 246, ${0.1 + Math.min(d.sumWeight / 25, 1) * 0.4})`}
-            // hexSideColor={d => `rgba(59, 130, 246, ${0.1 + Math.min(d.sumWeight / 25, 1) * 0.3})`}
-            // hexBinMerge={true}
-            
-            // Market points
-            pointsData={filtered}
-            pointLat="lat"
-            pointLng="lng"
-            pointAltitude={getAltitude}
-            pointColor={getColor}
-            pointRadius={d => {
-              const baseRadius = 0.4;
-              // Larger for highlighted market
-              if (highlightedMarket && d.id === highlightedMarket.id) {
-                return baseRadius + 0.3;
-              }
-              // Slightly larger for selected market
-              if (selected && d.id === selected.id) {
-                return baseRadius + 0.2;
-              }
-              return baseRadius;
-            }}
-            pointLabel={d => `
-              <div style="background:rgba(10,15,26,0.95);padding:14px 18px;border-radius:12px;border:1px solid ${d.category === 'Trump' ? 'rgba(220,38,38,0.4)' : 'rgba(59,130,246,0.3)'};max-width:300px;backdrop-filter:blur(12px);box-shadow:0 8px 32px rgba(0,0,0,0.4);">
-                <div style="font-size:10px;color:${d.category === 'Trump' ? '#f87171' : '#60a5fa'};font-weight:600;margin-bottom:4px;">${d.category === 'Trump' ? '🇺🇸 Trump' : '📍 ' + d.country} • ${d.category || 'Politics'}</div>
-                <div style="font-weight:600;color:white;margin-bottom:10px;font-size:13px;line-height:1.4;">${d.question}</div>
-                ${d.topOutcome ? `<div style="font-size:10px;color:#9ca3af;margin-bottom:8px;">Leading: ${d.topOutcome}</div>` : ''}
-                <div style="display:flex;gap:20px;">
-                  <div>
-                    <div style="color:#6b7280;font-size:9px;text-transform:uppercase;">Yes</div>
-                    <div style="color:#22c55e;font-weight:700;font-size:18px;">${d.probability}</div>
-                  </div>
-                  <div>
-                    <div style="color:#6b7280;font-size:9px;text-transform:uppercase;">Volume</div>
-                    <div style="color:white;font-weight:600;font-size:18px;">${d.formattedVolume}</div>
-                  </div>
-                </div>
-              </div>
-            `}
-            onPointClick={setSelected}
-            
-            // OSINT labels
-            labelsData={showOSINT ? news : []}
-            labelLat="lat"
-            labelLng="lng"
-            labelText={() => ''}
-            labelSize={0.8}
-            labelDotRadius={0.3}
-            labelColor={() => '#ef4444'}
-            labelAltitude={0.015}
-            labelLabel={d => `
-              <div style="background:rgba(127,29,29,0.95);padding:10px 14px;border-radius:10px;border:1px solid rgba(239,68,68,0.4);max-width:280px;backdrop-filter:blur(8px);">
-                <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-                  <span style="color:#f87171;font-size:10px;font-weight:600;">🔴 ${d.source}</span>
-                  <span style="color:#9ca3af;font-size:9px;">${d.time}</span>
-                </div>
-                <div style="color:#fecaca;font-size:11px;line-height:1.4;">${d.text}</div>
-                <div style="color:#60a5fa;font-size:9px;margin-top:6px;">📍 ${d.location}</div>
-              </div>
-            `}
-            
-            // Atmosphere
-            atmosphereColor="#3b82f6"
-            atmosphereAltitude={0.12}
-            
-            // Animated connection arcs
-            arcsData={tradeArcs}
-            arcStartLat="startLat"
-            arcStartLng="startLng"
-            arcEndLat="endLat"
-            arcEndLng="endLng"
-            arcColor="color"
-            arcAltitude="altitude"
-            arcStroke="stroke"
-            arcDashLength="dashLength"
-            arcDashGap="dashGap"
-            arcDashAnimateTime="dashAnimateTime"
-            
-            // Pulsing rings around high-volume markets + highlight ring
-            ringsData={pulseRings}
-            ringLat="lat"
-            ringLng="lng"
-            ringMaxRadius="maxR"
-            ringPropagationSpeed="propagationSpeed"
-            ringRepeatPeriod="repeatPeriod"
-            ringColor="color"
-            ringAltitude="altitude"
-            
-            // Static connection lines (disabled - may not be supported)
-            // pathsData={marketConnections}
-            // pathPoints={d => [[d.startLat, d.startLng], [d.endLat, d.endLng]]}
-            // pathColor="color"
-            // pathStroke="stroke"
-            // pathDashLength={0.01}
-            // pathDashGap={0.02}
-            // pathDashAnimateTime={0}
-          />
-
-          {/* Markets Panel */}
-          <div className="markets-panel">
-            {/* Markets List */}
-            <div className="panel-section">
-              <div className="panel-header">
-                <span className="panel-title">📊 Active Markets</span>
-                <span className="panel-badge">{filtered.length}</span>
-              </div>
-              <div className="category-tabs">
-                {categories.slice(0, 7).map(cat => (
-                  <button
-                    key={cat}
-                    className={`category-tab ${category === cat ? 'active' : ''} ${cat === 'Trump' ? 'trump' : ''}`}
-                    onClick={() => setCategory(cat)}
-                  >
-                    {cat === 'Trump' ? '🇺🇸 Trump' : cat}
-                  </button>
-                ))}
-              </div>
-              <div className="panel-content">
-                {filtered.slice(0, 12).map(m => (
-                  <button
-                    key={m.id}
-                    className={`market-item ${selected?.id === m.id ? 'active' : ''} ${m.category === 'Trump' ? 'trump-market' : ''}`}
-                    onClick={() => setSelected(m)}
-                  >
-                    <div className="market-item-header">
-                      <div style={{flex: 1, minWidth: 0}}>
-                        <div className="market-item-location">
-                          {m.category === 'Trump' ? '🇺🇸' : '📍'} {m.category === 'Trump' ? 'Trump' : m.country}
-                        </div>
-                        <div className="market-item-title">{m.question}</div>
-                        {m.topOutcome && (
-                          <div style={{fontSize: '10px', color: '#9ca3af', marginTop: '2px'}}>
-                            Top: {m.topOutcome}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <div className={`market-item-prob ${getProbClass(m.yesPrice)}`}>
-                          {m.probability}
-                        </div>
-                        <div className="market-item-meta">{m.formattedVolume}</div>
-                      </div>
-                    </div>
-                  </button>
-                ))}
+          </aside>
+          
+          {/* Globe Area */}
+          <main className="globe-area">
+            <div className="connection-status">
+              <div className={`connection-badge ${isConnected ? 'connected' : 'error'}`}>
+                <span className="live-dot" style={{width: 6, height: 6}}></span>
+                {isConnected ? 'API Connected' : 'Reconnecting...'}
               </div>
             </div>
-
-            {/* News Feed */}
-            <div className="panel-section">
-              <div className="panel-header">
-                <span className="panel-title">
-                  <span style={{color: '#ef4444'}}>●</span> Live X/OSINT Feed
-                </span>
-                <button 
-                  className="btn" 
-                  style={{padding: '4px 8px', fontSize: '10px', background: feedLoading ? 'rgba(59,130,246,0.2)' : 'rgba(239,68,68,0.15)', color: feedLoading ? '#60a5fa' : '#f87171', border: '1px solid rgba(239,68,68,0.3)'}}
-                  onClick={refreshOsintFeed}
-                  disabled={feedLoading}
+            
+            {highlightedMarket && !selectedMarket && (
+              <div 
+                className="spotlight-banner"
+                onClick={() => setSelectedMarket(highlightedMarket)}
+              >
+                <div className="spotlight-dot"></div>
+                <span className="spotlight-label">SPOTLIGHT</span>
+                <span className="spotlight-text">{highlightedMarket.question.substring(0, 45)}...</span>
+                <span 
+                  className="spotlight-prob"
+                  style={{color: highlightedMarket.probability >= 0.6 ? 'var(--accent-green)' : highlightedMarket.probability <= 0.4 ? 'var(--accent-red)' : 'var(--accent-yellow)'}}
                 >
-                  {feedLoading ? '↻ Loading...' : '↻ Refresh'}
-                </button>
+                  {highlightedMarket.probFormatted}
+                </span>
               </div>
-              <div className="panel-content" style={{maxHeight: '200px'}}>
-                {news.length === 0 ? (
-                  <div style={{padding: '20px', textAlign: 'center', color: '#6b7280', fontSize: '12px'}}>
-                    {feedLoading ? 'Fetching live feeds...' : 'No feed data. Click refresh to load.'}
-                  </div>
-                ) : (
-                  news.slice(0, 6).map(n => (
-                    <a 
-                      key={n.id} 
-                      className="news-item" 
-                      href={n.link} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      style={{display: 'block', textDecoration: 'none', cursor: 'pointer'}}
+            )}
+            
+            {selectedMarket && (
+              <div className="market-detail">
+                <div className="market-detail-header">
+                  <div className="market-detail-question">{selectedMarket.question}</div>
+                  <button className="market-detail-close" onClick={() => setSelectedMarket(null)}>✕</button>
+                </div>
+                <div className="market-detail-stats">
+                  <div className="market-detail-stat">
+                    <div 
+                      className="market-detail-stat-value"
+                      style={{color: selectedMarket.probability >= 0.6 ? 'var(--accent-green)' : selectedMarket.probability <= 0.4 ? 'var(--accent-red)' : 'var(--accent-yellow)'}}
                     >
-                      <div className="news-item-header">
-                        <span className="news-source">{n.source}</span>
-                        <span className="news-time">{n.time}</span>
-                      </div>
-                      <div className="news-text">{n.text}</div>
-                      <div className="news-location">📍 {n.location}</div>
-                    </a>
-                  ))
+                      {selectedMarket.probFormatted}
+                    </div>
+                    <div className="market-detail-stat-label">Probability</div>
+                  </div>
+                  <div className="market-detail-stat">
+                    <div className="market-detail-stat-value">{selectedMarket.volumeFormatted}</div>
+                    <div className="market-detail-stat-label">Volume</div>
+                  </div>
+                  <div className="market-detail-stat">
+                    <div className="market-detail-stat-value">{selectedMarket.country}</div>
+                    <div className="market-detail-stat-label">Location</div>
+                  </div>
+                </div>
+                {selectedMarket.url && (
+                  <a href={selectedMarket.url} target="_blank" rel="noopener noreferrer" className="market-detail-link">
+                    View on {selectedMarket.source === 'polymarket' ? 'Polymarket' : 'Manifold'} →
+                  </a>
                 )}
               </div>
-            </div>
-          </div>
-
-          {/* Selected Detail */}
-          {selected && (
-            <div className="detail-panel" style={selected.category === 'Trump' ? {borderColor: 'rgba(220, 38, 38, 0.4)'} : {}}>
-              <div className="detail-header">
-                <div>
-                  <div className="detail-location" style={selected.category === 'Trump' ? {color: '#f87171'} : {}}>
-                    {selected.category === 'Trump' ? '🇺🇸 Trump Administration' : `📍 ${selected.country} • ${selected.category}`}
-                  </div>
-                  <div className="detail-title">{selected.question}</div>
-                  {selected.topOutcome && (
-                    <div style={{fontSize: '11px', color: '#9ca3af', marginTop: '4px'}}>
-                      Leading: {selected.topOutcome}
-                    </div>
-                  )}
-                </div>
-                <button className="detail-close" onClick={() => setSelected(null)}>×</button>
-              </div>
+            )}
+            
+            <Globe
+              ref={globeEl}
+              globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
+              bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
+              backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
               
-              <div className="prob-section">
-                <div className="prob-labels">
-                  <span className="prob-yes">YES {selected.probability}</span>
-                  <span className="prob-no">NO {formatProb(selected.noPrice)}</span>
-                </div>
-                <div className="prob-bar">
-                  <div className="prob-bar-yes" style={{ width: `${selected.yesPrice * 100}%` }}></div>
-                  <div className="prob-bar-no" style={{ width: `${selected.noPrice * 100}%` }}></div>
-                </div>
-              </div>
-
-              <div className="stats-grid">
-                <div className="stat-box">
-                  <div className="stat-box-label">Volume</div>
-                  <div className="stat-box-value">{selected.formattedVolume}</div>
-                </div>
-                <div className="stat-box">
-                  <div className="stat-box-label">End Date</div>
-                  <div className="stat-box-value" style={{fontSize: '12px'}}>
-                    {new Date(selected.endDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+              polygonsData={countries.features || []}
+              polygonCapColor={() => 'rgba(0,0,0,0)'}
+              polygonSideColor={() => 'rgba(100,150,200,0.05)'}
+              polygonStrokeColor={() => 'rgba(100,180,255,0.3)'}
+              polygonAltitude={0.005}
+              
+              pointsData={filteredMarkets}
+              pointLat="lat"
+              pointLng="lng"
+              pointAltitude={d => Math.min(0.05 + d.volume / 50000000, 0.2)}
+              pointRadius={d => selectedMarket?.id === d.id || highlightedMarket?.id === d.id ? 0.6 : 0.35}
+              pointColor={d => d.category === 'Trump' ? '#dc2626' : d.probability >= 0.7 ? '#22c55e' : d.probability >= 0.4 ? '#eab308' : '#ef4444'}
+              pointLabel={d => `
+                <div style="background:rgba(10,15,26,0.95);padding:12px 16px;border-radius:10px;border:1px solid rgba(59,130,246,0.3);max-width:280px;">
+                  <div style="font-size:9px;color:#60a5fa;margin-bottom:4px;">${d.source.toUpperCase()} • ${d.country}</div>
+                  <div style="font-weight:600;color:white;margin-bottom:8px;font-size:12px;">${d.question}</div>
+                  <div style="display:flex;gap:16px;">
+                    <div>
+                      <div style="font-size:8px;color:#6b7280;">YES</div>
+                      <div style="color:#22c55e;font-weight:700;font-size:16px;">${d.probFormatted}</div>
+                    </div>
+                    <div>
+                      <div style="font-size:8px;color:#6b7280;">VOLUME</div>
+                      <div style="color:white;font-weight:600;font-size:16px;">${d.volumeFormatted}</div>
+                    </div>
                   </div>
                 </div>
-                <div className="stat-box">
-                  <div className="stat-box-label">Region</div>
-                  <div className="stat-box-value" style={{fontSize: '11px'}}>{selected.region}</div>
-                </div>
+              `}
+              onPointClick={setSelectedMarket}
+              
+              arcsData={arcs}
+              arcStartLat="startLat"
+              arcStartLng="startLng"
+              arcEndLat="endLat"
+              arcEndLng="endLng"
+              arcColor="color"
+              arcAltitude="altitude"
+              arcStroke="stroke"
+              arcDashLength="dashLength"
+              arcDashGap="dashGap"
+              arcDashAnimateTime="dashAnimateTime"
+              
+              ringsData={rings}
+              ringLat="lat"
+              ringLng="lng"
+              ringMaxRadius="maxR"
+              ringPropagationSpeed="propagationSpeed"
+              ringRepeatPeriod="repeatPeriod"
+              ringColor="color"
+              
+              atmosphereColor="#3b82f6"
+              atmosphereAltitude={0.15}
+            />
+          </main>
+          
+          {/* Right Panel - Activity & News */}
+          <aside className="right-panel">
+            <div className="activity-tabs">
+              <button 
+                className={`activity-tab ${activityTab === 'activity' ? 'active' : ''}`}
+                onClick={() => setActivityTab('activity')}
+              >
+                🔴 Live Activity
+              </button>
+              <button 
+                className={`activity-tab ${activityTab === 'news' ? 'active' : ''}`}
+                onClick={() => setActivityTab('news')}
+              >
+                📰 News
+              </button>
+            </div>
+            
+            {activityTab === 'activity' ? (
+              <div className="activity-feed">
+                {activities.map(activity => (
+                  <div key={activity.id} className={`activity-item ${activity.isWhale ? 'whale' : ''}`}>
+                    <span className="activity-icon">
+                      {activity.isWhale ? '🐋' : activity.action === 'BUY' ? '📈' : '📉'}
+                    </span>
+                    <div className="activity-content">
+                      <div className="activity-title">{activity.market}</div>
+                      <div className="activity-meta">
+                        <span className={`activity-amount ${activity.action.toLowerCase()}`}>
+                          {activity.action} ${activity.amount.toLocaleString()}
+                        </span>
+                        <span>•</span>
+                        <span>{activity.source}</span>
+                      </div>
+                    </div>
+                    <span className="activity-time">{formatTime(activity.time)}</span>
+                  </div>
+                ))}
               </div>
-
-              <div className="action-buttons">
-                <a
-                  href={`https://polymarket.com/event/${selected.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn-trade"
-                >
-                  Trade on Polymarket →
-                </a>
-                <button className="btn-icon">📊</button>
-                <button className="btn-icon">🔔</button>
+            ) : (
+              <div className="news-feed">
+                {news.map(item => (
+                  <a 
+                    key={item.id} 
+                    href={item.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className={`news-item ${item.isBreaking ? 'breaking' : ''}`}
+                    style={{textDecoration: 'none', display: 'block'}}
+                  >
+                    <div className="news-source">
+                      {item.isBreaking && '🔴 '}{item.source}
+                    </div>
+                    <div className="news-title">{item.title}</div>
+                    <div className="news-time">{formatTime(item.time)}</div>
+                  </a>
+                ))}
               </div>
-            </div>
-          )}
-
-          {/* Legend */}
-          <div className="legend">
-            <div className="legend-title">Market Indicators</div>
-            <div className="legend-item">
-              <div className="legend-dot" style={{background: '#dc2626'}}></div>
-              <span>🇺🇸 Trump Markets</span>
-            </div>
-            <div className="legend-divider"></div>
-            <div className="legend-item">
-              <div className="legend-dot green"></div>
-              <span>High (70%+)</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-dot yellow"></div>
-              <span>Uncertain (40-70%)</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-dot red"></div>
-              <span>Low (&lt;40%)</span>
-            </div>
-            <div className="legend-divider"></div>
-            <div className="legend-item">
-              <div className="legend-dot red pulse"></div>
-              <span>OSINT Event</span>
-            </div>
-            <div className="legend-item">
-              <div className="legend-line"></div>
-              <span>High Volume Arc</span>
+            )}
+          </aside>
+          
+          {/* News Ticker */}
+          <div className="news-ticker">
+            <span className="ticker-label">🔴 BREAKING</span>
+            <div className="ticker-content">
+              {tickerContent.map((item, idx) => (
+                <span key={idx} className="ticker-item">{item}</span>
+              ))}
             </div>
           </div>
-
-          {/* Status Bar */}
-          <div className="status-bar">
-            <div className={`status-dot ${isOnline ? '' : 'offline'}`}></div>
-            <span>{isOnline ? 'Connected' : 'Offline'}</span>
-            <span>•</span>
-            <span>Updated {lastUpdate.toLocaleTimeString()}</span>
-            <span>•</span>
-            <span>Polymarket API</span>
-          </div>
-        </>
+        </div>
       );
     }
 
-    ReactDOM.createRoot(document.getElementById('root')).render(<ConnecTHOR />);
+    ReactDOM.createRoot(document.getElementById('root')).render(<ConnecTHORApp />);
   </script>
 </body>
 </html>
