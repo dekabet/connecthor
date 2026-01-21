@@ -1669,7 +1669,6 @@
       const [search, setSearch] = useState('');
       const [showOSINT, setShowOSINT] = useState(true);
       const [showBorders, setShowBorders] = useState(true);
-      const [showHexDensity, setShowHexDensity] = useState(true);
       const [liveLoading, setLiveLoading] = useState(false);
       const [category, setCategory] = useState('Trump');
       const [countries, setCountries] = useState({ features: [] });
@@ -1677,7 +1676,6 @@
       const [lastUpdate, setLastUpdate] = useState(new Date());
       const [dataSource, setDataSource] = useState('sample'); // 'sample' or 'live'
       const [highlightedMarket, setHighlightedMarket] = useState(null);
-      const [animationTick, setAnimationTick] = useState(0);
 
       // Periodic market highlight animation
       useEffect(() => {
@@ -1696,14 +1694,6 @@
         
         return () => clearInterval(highlightInterval);
       }, [markets]);
-      
-      // Animation tick for smooth updates
-      useEffect(() => {
-        const animInterval = setInterval(() => {
-          setAnimationTick(t => (t + 1) % 1000);
-        }, 100);
-        return () => clearInterval(animInterval);
-      }, []);
 
       // Process markets (either sample or live)
       const processMarkets = (rawMarkets) => {
@@ -1941,6 +1931,25 @@
       const totalVolume = useMemo(() => 
         (filtered.reduce((s, m) => s + parseFloat(m.volume || 0), 0) / 1e6).toFixed(1)
       , [filtered]);
+      
+      // Memoized animation data
+      const tradeArcs = useMemo(() => generateTradeArcs(filtered), [filtered]);
+      
+      const pulseRings = useMemo(() => {
+        const baseRings = generatePulseRings(filtered);
+        if (highlightedMarket) {
+          baseRings.unshift({
+            lat: highlightedMarket.lat,
+            lng: highlightedMarket.lng,
+            maxR: 6,
+            propagationSpeed: 4,
+            repeatPeriod: 800,
+            color: 'rgba(255, 255, 255, 0.8)',
+            altitude: 0.02,
+          });
+        }
+        return baseRings;
+      }, [filtered, highlightedMarket]);
 
       // Color helpers - Trump markets get special color
       const getColor = useCallback((m) => {
@@ -2002,14 +2011,6 @@
                   onClick={() => setShowBorders(!showBorders)}
                 >
                   🗺️ Borders
-                </button>
-                
-                <button
-                  className={`btn ${!showHexDensity ? 'inactive' : ''}`}
-                  onClick={() => setShowHexDensity(!showHexDensity)}
-                  style={{background: showHexDensity ? 'rgba(139, 92, 246, 0.15)' : 'var(--bg-secondary)', color: showHexDensity ? '#a78bfa' : 'var(--text-muted)', borderColor: showHexDensity ? 'rgba(139, 92, 246, 0.3)' : 'var(--border)'}}
-                >
-                  🔷 Density
                 </button>
                 
                 <button
@@ -2165,22 +2166,16 @@
             polygonStrokeColor={() => 'rgba(100, 180, 255, 0.35)'}
             polygonAltitude={0.005}
             
-            // Hex bin density visualization
-            hexBinPointsData={showHexDensity ? filtered : []}
-            hexBinPointLat="lat"
-            hexBinPointLng="lng"
-            hexBinPointWeight={d => Math.log10(Math.max(parseFloat(d.volume) || 1, 1))}
-            hexBinResolution={3}
-            hexAltitude={d => Math.min(d.sumWeight * 0.003, 0.15)}
-            hexTopColor={d => {
-              const intensity = Math.min(d.sumWeight / 25, 1);
-              return `rgba(139, 92, 246, ${0.1 + intensity * 0.4})`;
-            }}
-            hexSideColor={d => {
-              const intensity = Math.min(d.sumWeight / 25, 1);
-              return `rgba(59, 130, 246, ${0.1 + intensity * 0.3})`;
-            }}
-            hexBinMerge={true}
+            // Hex bin density visualization (disabled - may not be in all globe.gl versions)
+            // hexBinPointsData={showHexDensity ? filtered : []}
+            // hexBinPointLat="lat"
+            // hexBinPointLng="lng"
+            // hexBinPointWeight={d => Math.log10(Math.max(parseFloat(d.volume) || 1, 1))}
+            // hexBinResolution={3}
+            // hexAltitude={d => Math.min(d.sumWeight * 0.003, 0.15)}
+            // hexTopColor={d => `rgba(139, 92, 246, ${0.1 + Math.min(d.sumWeight / 25, 1) * 0.4})`}
+            // hexSideColor={d => `rgba(59, 130, 246, ${0.1 + Math.min(d.sumWeight / 25, 1) * 0.3})`}
+            // hexBinMerge={true}
             
             // Market points
             pointsData={filtered}
@@ -2190,9 +2185,9 @@
             pointColor={getColor}
             pointRadius={d => {
               const baseRadius = 0.4;
-              // Pulse effect for highlighted market
+              // Larger for highlighted market
               if (highlightedMarket && d.id === highlightedMarket.id) {
-                return baseRadius + 0.3 * Math.sin(animationTick * 0.3);
+                return baseRadius + 0.3;
               }
               // Slightly larger for selected market
               if (selected && d.id === selected.id) {
@@ -2244,7 +2239,7 @@
             atmosphereAltitude={0.12}
             
             // Animated connection arcs
-            arcsData={useMemo(() => generateTradeArcs(filtered), [filtered])}
+            arcsData={tradeArcs}
             arcStartLat="startLat"
             arcStartLng="startLng"
             arcEndLat="endLat"
@@ -2257,22 +2252,7 @@
             arcDashAnimateTime="dashAnimateTime"
             
             // Pulsing rings around high-volume markets + highlight ring
-            ringsData={useMemo(() => {
-              const baseRings = generatePulseRings(filtered);
-              // Add special highlight ring
-              if (highlightedMarket) {
-                baseRings.unshift({
-                  lat: highlightedMarket.lat,
-                  lng: highlightedMarket.lng,
-                  maxR: 6,
-                  propagationSpeed: 4,
-                  repeatPeriod: 800,
-                  color: 'rgba(255, 255, 255, 0.8)',
-                  altitude: 0.02,
-                });
-              }
-              return baseRings;
-            }, [filtered, highlightedMarket])}
+            ringsData={pulseRings}
             ringLat="lat"
             ringLng="lng"
             ringMaxRadius="maxR"
@@ -2281,14 +2261,14 @@
             ringColor="color"
             ringAltitude="altitude"
             
-            // Static connection lines between related markets
-            pathsData={useMemo(() => generateMarketConnections(filtered), [filtered])}
-            pathPoints={d => [[d.startLat, d.startLng], [d.endLat, d.endLng]]}
-            pathColor="color"
-            pathStroke="stroke"
-            pathDashLength={0.01}
-            pathDashGap={0.02}
-            pathDashAnimateTime={0}
+            // Static connection lines (disabled - may not be supported)
+            // pathsData={marketConnections}
+            // pathPoints={d => [[d.startLat, d.startLng], [d.endLat, d.endLng]]}
+            // pathColor="color"
+            // pathStroke="stroke"
+            // pathDashLength={0.01}
+            // pathDashGap={0.02}
+            // pathDashAnimateTime={0}
           />
 
           {/* Markets Panel */}
