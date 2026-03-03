@@ -24,11 +24,13 @@
     .stat-val.live{color:var(--green);display:flex;align-items:center;gap:6px}
     .stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase}
     .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+    .dot.red{background:var(--red)}
     @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
     .left{grid-area:l;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
     .panel-hd{padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
     .panel-title{font-size:13px;font-weight:700}
     .badge{background:var(--blue);color:white;font-size:10px;padding:2px 8px;border-radius:10px}
+    .badge.live{background:var(--green)}
     .tabs{display:flex;padding:8px;gap:4px;border-bottom:1px solid var(--border)}
     .tab{flex:1;padding:6px;border-radius:6px;border:none;background:transparent;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer}
     .tab:hover{background:rgba(255,255,255,0.05);color:white}
@@ -77,23 +79,24 @@
     .act-time{font-size:10px;color:var(--muted)}
     .news{padding:10px;border-radius:8px;margin-bottom:6px;background:rgba(15,23,42,0.85);border:1px solid var(--border);cursor:pointer;text-decoration:none;display:block;color:inherit}
     .news:hover{border-color:var(--blue)}
-    .news.breaking{border-left:3px solid var(--red);animation:flash 2s ease-out}
-    @keyframes flash{0%{background:rgba(239,68,68,0.2)}100%{background:rgba(15,23,42,0.85)}}
-    .news-src{font-size:9px;font-weight:600;color:var(--blue);text-transform:uppercase;margin-bottom:4px}
+    .news.breaking{border-left:3px solid var(--red);background:rgba(239,68,68,0.05)}
+    .news-src{font-size:9px;font-weight:600;color:var(--blue);text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:6px}
     .news-title{font-size:12px;line-height:1.4}
     .news-time{font-size:10px;color:var(--muted);margin-top:4px}
     .ticker{grid-area:t;background:linear-gradient(90deg,rgba(220,38,38,0.15),rgba(239,68,68,0.1));border-top:1px solid rgba(239,68,68,0.3);padding:8px 0;overflow:hidden;display:flex;align-items:center}
     .ticker-lbl{background:var(--red);color:white;padding:4px 12px;font-size:10px;font-weight:700;margin-right:16px;flex-shrink:0;display:flex;align-items:center;gap:6px}
     .ticker-lbl .livedot{width:6px;height:6px;background:white;border-radius:50%;animation:pulse 1s infinite}
-    .ticker-scroll{display:flex;animation:scroll 60s linear infinite;white-space:nowrap}
+    .ticker-scroll{display:flex;animation:scroll 80s linear infinite;white-space:nowrap}
     .ticker-scroll:hover{animation-play-state:paused}
     @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-    .ticker-item{padding:0 30px;font-size:12px;cursor:pointer}
+    .ticker-item{padding:0 40px;font-size:12px;cursor:pointer}
     .ticker-item:hover{color:var(--blue)}
-    .ticker-item::after{content:'•';margin-left:30px;color:var(--red)}
+    .ticker-item::after{content:'•';margin-left:40px;color:var(--red)}
     .loading{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg)}
     .loading-icon{font-size:64px}
     .news-loading{text-align:center;padding:20px;color:var(--muted);font-size:11px}
+    .news-status{font-size:9px;padding:4px 8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:4px;color:var(--green)}
+    .news-status.rss{background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.3);color:var(--yellow)}
     ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     @media(max-width:1000px){.app{grid-template-columns:1fr;grid-template-areas:"h" "g" "t"}.left,.right{display:none}}
   </style>
@@ -104,6 +107,95 @@
 const{useState,useEffect,useRef,useMemo}=React;
 const Globe=window.Globe;
 
+// ============ NEWS API CONFIG ============
+const NEWS_API_KEY = 'ff2b715299a74826b0da01866c40ef60';
+const NEWS_API_URL = 'https://newsapi.org/v2/top-headlines?category=general&language=en&pageSize=30';
+
+// RSS Fallback feeds (for when NewsAPI fails on deployed sites)
+const RSS_FEEDS=[
+{url:'https://feeds.bbci.co.uk/news/world/rss.xml',name:'BBC'},
+{url:'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',name:'NYT'},
+{url:'https://www.aljazeera.com/xml/rss/all.xml',name:'Al Jazeera'},
+{url:'https://feeds.npr.org/1001/rss.xml',name:'NPR'},
+{url:'https://feeds.reuters.com/Reuters/worldNews',name:'Reuters'},
+];
+
+// Fetch from NewsAPI (works on localhost, blocked on deployed sites)
+async function fetchNewsAPI() {
+  try {
+    const res = await fetch(NEWS_API_URL, {
+      headers: { 'X-Api-Key': NEWS_API_KEY },
+      signal: AbortSignal.timeout(5000)
+    });
+    if (!res.ok) throw new Error('NewsAPI blocked');
+    const data = await res.json();
+    if (data.status !== 'ok' || !data.articles) throw new Error('No articles');
+    
+    return {
+      source: 'newsapi',
+      items: data.articles.slice(0, 25).map(a => ({
+        id: 'na-' + Math.random().toString(36).substr(2, 6),
+        title: a.title?.split(' - ')[0] || '',
+        source: a.source?.name || 'News',
+        url: a.url,
+        time: new Date(a.publishedAt),
+        isBreaking: (Date.now() - new Date(a.publishedAt).getTime()) < 1800000, // 30 min
+        image: a.urlToImage,
+      })).filter(n => n.title && n.title.length > 10)
+    };
+  } catch (e) {
+    console.log('NewsAPI error:', e.message);
+    return null;
+  }
+}
+
+// Fetch from RSS feeds (fallback)
+async function fetchRSSFeeds() {
+  const all = [];
+  for (const feed of RSS_FEEDS) {
+    try {
+      const r = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feed.url), {
+        signal: AbortSignal.timeout(5000)
+      });
+      if (!r.ok) continue;
+      const d = await r.json();
+      if (d.status === 'ok' && d.items) {
+        d.items.slice(0, 4).forEach(item => {
+          all.push({
+            id: 'rss-' + Math.random().toString(36).substr(2, 6),
+            title: item.title?.replace(/<[^>]+>/g, '').trim() || '',
+            source: feed.name,
+            url: item.link,
+            time: new Date(item.pubDate),
+            isBreaking: (Date.now() - new Date(item.pubDate).getTime()) < 3600000,
+          });
+        });
+      }
+    } catch (e) {}
+  }
+  return {
+    source: 'rss',
+    items: all.filter(n => n.title && n.title.length > 10).sort((a, b) => b.time - a.time).slice(0, 25)
+  };
+}
+
+// Main news fetcher - tries NewsAPI first, falls back to RSS
+async function fetchNews() {
+  // Try NewsAPI first (faster, more real-time)
+  const newsApi = await fetchNewsAPI();
+  if (newsApi && newsApi.items.length > 0) {
+    console.log('✓ NewsAPI: Got', newsApi.items.length, 'articles');
+    return newsApi;
+  }
+  
+  // Fallback to RSS
+  console.log('NewsAPI unavailable, using RSS fallback...');
+  const rss = await fetchRSSFeeds();
+  console.log('✓ RSS: Got', rss.items.length, 'articles');
+  return rss;
+}
+
+// ============ MARKETS DATA ============
 const MARKETS=[
 {id:'1',question:'Will Trump win 2028 presidential election?',probability:0.42,volume:45000000,source:'polymarket',lat:38.9,lng:-77,country:'USA',category:'Trump'},
 {id:'2',question:'Will Trump fire Fed Chair Powell?',probability:0.28,volume:12000000,source:'polymarket',lat:38.89,lng:-77.04,country:'USA',category:'Trump'},
@@ -127,30 +219,6 @@ const MARKETS=[
 {id:'20',question:'Will Trump pardon Jan 6 defendants?',probability:0.82,volume:6500000,source:'polymarket',lat:38.9,lng:-77.01,country:'USA',category:'Trump'},
 ];
 
-const RSS_FEEDS=[
-{url:'https://feeds.bbci.co.uk/news/world/rss.xml',name:'BBC World'},
-{url:'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',name:'NY Times'},
-{url:'https://www.aljazeera.com/xml/rss/all.xml',name:'Al Jazeera'},
-{url:'https://feeds.npr.org/1001/rss.xml',name:'NPR News'},
-];
-
-async function fetchNews(){
-const all=[];
-for(const feed of RSS_FEEDS){
-try{
-const r=await fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(feed.url),{signal:AbortSignal.timeout(6000)});
-if(!r.ok)continue;
-const d=await r.json();
-if(d.status==='ok'&&d.items){
-d.items.slice(0,5).forEach(item=>{
-all.push({id:'n-'+Math.random().toString(36).substr(2,6),title:item.title?.replace(/<[^>]+>/g,'').trim()||'',source:feed.name,url:item.link,time:new Date(item.pubDate),isBreaking:(Date.now()-new Date(item.pubDate).getTime())<3600000});
-});
-}
-}catch(e){console.log('Feed error:',feed.name)}
-}
-return all.filter(n=>n.title&&n.title.length>10).sort((a,b)=>b.time-a.time).slice(0,25);
-}
-
 const PROXIES=['','https://corsproxy.io/?','https://api.allorigins.win/raw?url='];
 const LOCS={trump:{lat:38.9,lng:-77,c:'USA'},ukraine:{lat:48.38,lng:31.17,c:'Ukraine'},russia:{lat:55.76,lng:37.62,c:'Russia'},china:{lat:39.9,lng:116.4,c:'China'},taiwan:{lat:25.03,lng:121.57,c:'Taiwan'},iran:{lat:35.69,lng:51.39,c:'Iran'},israel:{lat:31.77,lng:35.22,c:'Israel'},bitcoin:{lat:37.77,lng:-122.42,c:'USA'},fed:{lat:38.89,lng:-77.04,c:'USA'}};
 
@@ -158,7 +226,7 @@ function getLoc(q){const l=q.toLowerCase();for(const[k,v]of Object.entries(LOCS)
 function getCat(q){const l=q.toLowerCase();if(l.includes('trump'))return'Trump';if(l.includes('war')||l.includes('military'))return'Conflict';if(l.includes('bitcoin')||l.includes('economy'))return'Economy';if(l.includes('tariff'))return'Trade';return'Politics'}
 const fmtProb=p=>Math.round(p*100)+'%';
 const fmtVol=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':v>=1e3?'$'+(v/1e3).toFixed(0)+'K':'$'+v;
-const fmtTime=d=>{const m=Math.floor((Date.now()-new Date(d).getTime())/60000);return m<60?m+'m ago':Math.floor(m/60)+'h ago'};
+const fmtTime=d=>{const m=Math.floor((Date.now()-new Date(d).getTime())/60000);if(m<1)return'Just now';if(m<60)return m+'m ago';return Math.floor(m/60)+'h ago'};
 
 async function fetchPoly(){for(const p of PROXIES){try{const url=p?p+encodeURIComponent('https://gamma-api.polymarket.com/events?closed=false&active=true&limit=50'):'https://gamma-api.polymarket.com/events?closed=false&active=true&limit=50';const r=await fetch(url,{signal:AbortSignal.timeout(8000)});if(!r.ok)continue;const d=await r.json();if(!Array.isArray(d))continue;const ms=[];for(const e of d){if(!e.markets?.length)continue;const m=e.markets[0];const loc=getLoc(e.title||m.question||'');if(!loc)continue;let prob=0.5;try{const pr=typeof m.outcomePrices==='string'?m.outcomePrices.split(','):m.outcomePrices;prob=parseFloat(pr[0])||0.5}catch(x){}ms.push({id:m.id||e.id,question:e.title||m.question,probability:prob,volume:parseFloat(m.volume||0),source:'polymarket',slug:e.slug,url:'https://polymarket.com/event/'+e.slug,...loc,category:getCat(e.title||m.question||'')});}if(ms.length>0)return ms}catch(x){}}return[]}
 
@@ -170,6 +238,7 @@ function App(){
 const globeEl=useRef();
 const[markets,setMarkets]=useState(MARKETS);
 const[news,setNews]=useState([]);
+const[newsSource,setNewsSource]=useState('loading');
 const[newsLoading,setNewsLoading]=useState(true);
 const[activities,setActivities]=useState(()=>genActs(MARKETS));
 const[loading,setLoading]=useState(true);
@@ -182,11 +251,24 @@ const[catFilter,setCatFilter]=useState('All');
 const[tab,setTab]=useState('news');
 const[countries,setCountries]=useState({features:[]});
 const[lastUpd,setLastUpd]=useState(new Date());
+const[newsLastUpd,setNewsLastUpd]=useState(null);
 
+// Fetch news on mount and every 2 minutes
 useEffect(()=>{
-const loadNews=async()=>{setNewsLoading(true);try{const n=await fetchNews();if(n.length>0){setNews(n);console.log('Loaded',n.length,'news')}}catch(e){}setNewsLoading(false)};
+const loadNews=async()=>{
+setNewsLoading(true);
+try{
+const result=await fetchNews();
+if(result&&result.items.length>0){
+setNews(result.items);
+setNewsSource(result.source);
+setNewsLastUpd(new Date());
+}
+}catch(e){console.log('News error:',e)}
+setNewsLoading(false);
+};
 loadNews();
-const i=setInterval(loadNews,300000);
+const i=setInterval(loadNews,120000); // Refresh every 2 min
 return()=>clearInterval(i);
 },[]);
 
@@ -206,7 +288,7 @@ const filtered=useMemo(()=>markets.filter(m=>{if(search&&!m.question.toLowerCase
 const stats=useMemo(()=>({total:markets.length,volume:markets.reduce((s,m)=>s+m.volume,0),poly:markets.filter(m=>m.source==='polymarket').length,mf:markets.filter(m=>m.source==='manifold').length}),[markets]);
 const arcs=useMemo(()=>genArcs(filtered),[filtered]);
 const rings=useMemo(()=>genRings(filtered,highlighted),[filtered,highlighted]);
-const ticker=useMemo(()=>{if(news.length===0)return['Loading live news...','Loading live news...'];const t=news.slice(0,12).map(n=>n.source+': '+n.title);return[...t,...t]},[news]);
+const ticker=useMemo(()=>{if(news.length===0)return['Loading live news...','Connecting to news sources...'];const t=news.slice(0,15).map(n=>(n.isBreaking?'🔴 ':'')+n.source+': '+n.title);return[...t,...t]},[news]);
 const cats=['All','Trump','Politics','Conflict','Economy','Trade'];
 
 if(loading)return<div className="loading"><div className="loading-icon">⚡</div><h2 style={{marginTop:16,fontSize:24,fontWeight:800}}>ConnecTHOR v2.0</h2></div>;
@@ -286,9 +368,13 @@ return(
 </div>
 ):(
 <div className="feed">
-{newsLoading?<div className="news-loading">⏳ Loading live news...</div>:news.length===0?<div className="news-loading">No news. Retry in 5min.</div>:news.slice(0,15).map(n=>(
+<div style={{padding:'8px 10px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+<span style={{fontSize:10,color:'var(--muted)'}}>Source: <span className={`news-status ${newsSource==='rss'?'rss':''}`}>{newsSource==='newsapi'?'⚡ NewsAPI':'📡 RSS Feeds'}</span></span>
+{newsLastUpd&&<span style={{fontSize:9,color:'var(--muted)'}}>Updated {fmtTime(newsLastUpd)}</span>}
+</div>
+{newsLoading?<div className="news-loading">⏳ Fetching live news...</div>:news.length===0?<div className="news-loading">No news available</div>:news.slice(0,15).map(n=>(
 <a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer" className={`news ${n.isBreaking?'breaking':''}`}>
-<div className="news-src">{n.isBreaking&&'🔴 '}{n.source}</div>
+<div className="news-src">{n.isBreaking&&<span className="dot red" style={{width:6,height:6,display:'inline-block',marginRight:4}}></span>}{n.source}</div>
 <div className="news-title">{n.title}</div>
 <div className="news-time">{fmtTime(n.time)}</div>
 </a>
