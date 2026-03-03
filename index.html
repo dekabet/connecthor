@@ -75,19 +75,25 @@
     .act-amt{font-size:12px;font-weight:700}
     .act-amt.buy{color:var(--green)}.act-amt.sell{color:var(--red)}
     .act-time{font-size:10px;color:var(--muted)}
-    .news{padding:10px;border-radius:8px;margin-bottom:6px;background:rgba(15,23,42,0.85);border:1px solid var(--border);cursor:pointer}
+    .news{padding:10px;border-radius:8px;margin-bottom:6px;background:rgba(15,23,42,0.85);border:1px solid var(--border);cursor:pointer;text-decoration:none;display:block;color:inherit}
     .news:hover{border-color:var(--blue)}
+    .news.breaking{border-left:3px solid var(--red);animation:flash 2s ease-out}
+    @keyframes flash{0%{background:rgba(239,68,68,0.2)}100%{background:rgba(15,23,42,0.85)}}
     .news-src{font-size:9px;font-weight:600;color:var(--blue);text-transform:uppercase;margin-bottom:4px}
     .news-title{font-size:12px;line-height:1.4}
     .news-time{font-size:10px;color:var(--muted);margin-top:4px}
     .ticker{grid-area:t;background:linear-gradient(90deg,rgba(220,38,38,0.15),rgba(239,68,68,0.1));border-top:1px solid rgba(239,68,68,0.3);padding:8px 0;overflow:hidden;display:flex;align-items:center}
-    .ticker-lbl{background:var(--red);color:white;padding:4px 12px;font-size:10px;font-weight:700;margin-right:16px;flex-shrink:0}
-    .ticker-scroll{display:flex;animation:scroll 45s linear infinite;white-space:nowrap}
+    .ticker-lbl{background:var(--red);color:white;padding:4px 12px;font-size:10px;font-weight:700;margin-right:16px;flex-shrink:0;display:flex;align-items:center;gap:6px}
+    .ticker-lbl .livedot{width:6px;height:6px;background:white;border-radius:50%;animation:pulse 1s infinite}
+    .ticker-scroll{display:flex;animation:scroll 60s linear infinite;white-space:nowrap}
+    .ticker-scroll:hover{animation-play-state:paused}
     @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-    .ticker-item{padding:0 30px;font-size:12px}
+    .ticker-item{padding:0 30px;font-size:12px;cursor:pointer}
+    .ticker-item:hover{color:var(--blue)}
     .ticker-item::after{content:'•';margin-left:30px;color:var(--red)}
     .loading{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg)}
     .loading-icon{font-size:64px}
+    .news-loading{text-align:center;padding:20px;color:var(--muted);font-size:11px}
     ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
     @media(max-width:1000px){.app{grid-template-columns:1fr;grid-template-areas:"h" "g" "t"}.left,.right{display:none}}
   </style>
@@ -121,249 +127,182 @@ const MARKETS=[
 {id:'20',question:'Will Trump pardon Jan 6 defendants?',probability:0.82,volume:6500000,source:'polymarket',lat:38.9,lng:-77.01,country:'USA',category:'Trump'},
 ];
 
-const NEWS=[
-{id:'n1',title:'Trump announces new tariff package targeting European imports',source:'Reuters',time:new Date(Date.now()-1800000)},
-{id:'n2',title:'Ukraine launches counter-offensive in eastern regions',source:'BBC',time:new Date(Date.now()-3600000)},
-{id:'n3',title:'Federal Reserve signals potential rate adjustment',source:'Bloomberg',time:new Date(Date.now()-5400000)},
-{id:'n4',title:'China responds to US trade restrictions',source:'SCMP',time:new Date(Date.now()-7200000)},
-{id:'n5',title:'Iran nuclear talks resume in Vienna',source:'Al Jazeera',time:new Date(Date.now()-9000000)},
-{id:'n6',title:'Bitcoin surges past key resistance level',source:'CoinDesk',time:new Date(Date.now()-10800000)},
-{id:'n7',title:'NATO discusses expansion amid security concerns',source:'AP',time:new Date(Date.now()-14400000)},
-{id:'n8',title:'Middle East peace talks show progress',source:'NYT',time:new Date(Date.now()-18000000)},
+const RSS_FEEDS=[
+{url:'https://feeds.bbci.co.uk/news/world/rss.xml',name:'BBC World'},
+{url:'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',name:'NY Times'},
+{url:'https://www.aljazeera.com/xml/rss/all.xml',name:'Al Jazeera'},
+{url:'https://feeds.npr.org/1001/rss.xml',name:'NPR News'},
 ];
 
-const PROXIES=['','https://corsproxy.io/?','https://api.allorigins.win/raw?url='];
+async function fetchNews(){
+const all=[];
+for(const feed of RSS_FEEDS){
+try{
+const r=await fetch('https://api.rss2json.com/v1/api.json?rss_url='+encodeURIComponent(feed.url),{signal:AbortSignal.timeout(6000)});
+if(!r.ok)continue;
+const d=await r.json();
+if(d.status==='ok'&&d.items){
+d.items.slice(0,5).forEach(item=>{
+all.push({id:'n-'+Math.random().toString(36).substr(2,6),title:item.title?.replace(/<[^>]+>/g,'').trim()||'',source:feed.name,url:item.link,time:new Date(item.pubDate),isBreaking:(Date.now()-new Date(item.pubDate).getTime())<3600000});
+});
+}
+}catch(e){console.log('Feed error:',feed.name)}
+}
+return all.filter(n=>n.title&&n.title.length>10).sort((a,b)=>b.time-a.time).slice(0,25);
+}
 
-const LOCS={trump:{lat:38.9,lng:-77,c:'USA'},ukraine:{lat:48.38,lng:31.17,c:'Ukraine'},russia:{lat:55.76,lng:37.62,c:'Russia'},china:{lat:39.9,lng:116.4,c:'China'},taiwan:{lat:25.03,lng:121.57,c:'Taiwan'},iran:{lat:35.69,lng:51.39,c:'Iran'},israel:{lat:31.77,lng:35.22,c:'Israel'},germany:{lat:52.52,lng:13.41,c:'Germany'},france:{lat:48.86,lng:2.35,c:'France'},uk:{lat:51.51,lng:-0.13,c:'UK'},nato:{lat:50.85,lng:4.36,c:'NATO'},eu:{lat:50.85,lng:4.35,c:'EU'},bitcoin:{lat:37.77,lng:-122.42,c:'USA'},fed:{lat:38.89,lng:-77.04,c:'USA'},tariff:{lat:38.9,lng:-77,c:'USA'}};
+const PROXIES=['','https://corsproxy.io/?','https://api.allorigins.win/raw?url='];
+const LOCS={trump:{lat:38.9,lng:-77,c:'USA'},ukraine:{lat:48.38,lng:31.17,c:'Ukraine'},russia:{lat:55.76,lng:37.62,c:'Russia'},china:{lat:39.9,lng:116.4,c:'China'},taiwan:{lat:25.03,lng:121.57,c:'Taiwan'},iran:{lat:35.69,lng:51.39,c:'Iran'},israel:{lat:31.77,lng:35.22,c:'Israel'},bitcoin:{lat:37.77,lng:-122.42,c:'USA'},fed:{lat:38.89,lng:-77.04,c:'USA'}};
 
 function getLoc(q){const l=q.toLowerCase();for(const[k,v]of Object.entries(LOCS)){if(l.includes(k))return{lat:v.lat+(Math.random()-0.5)*2,lng:v.lng+(Math.random()-0.5)*2,country:v.c}}return null}
-function getCat(q){const l=q.toLowerCase();if(l.includes('trump'))return'Trump';if(l.includes('war')||l.includes('military')||l.includes('conflict'))return'Conflict';if(l.includes('bitcoin')||l.includes('economy')||l.includes('fed'))return'Economy';if(l.includes('tariff')||l.includes('trade'))return'Trade';return'Politics'}
+function getCat(q){const l=q.toLowerCase();if(l.includes('trump'))return'Trump';if(l.includes('war')||l.includes('military'))return'Conflict';if(l.includes('bitcoin')||l.includes('economy'))return'Economy';if(l.includes('tariff'))return'Trade';return'Politics'}
 const fmtProb=p=>Math.round(p*100)+'%';
 const fmtVol=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':v>=1e3?'$'+(v/1e3).toFixed(0)+'K':'$'+v;
 const fmtTime=d=>{const m=Math.floor((Date.now()-new Date(d).getTime())/60000);return m<60?m+'m ago':Math.floor(m/60)+'h ago'};
 
-async function fetchPoly(){
-  for(const p of PROXIES){
-    try{
-      const url=p?p+encodeURIComponent('https://gamma-api.polymarket.com/events?closed=false&active=true&limit=50'):'https://gamma-api.polymarket.com/events?closed=false&active=true&limit=50';
-      const r=await fetch(url,{signal:AbortSignal.timeout(8000)});
-      if(!r.ok)continue;
-      const d=await r.json();
-      if(!Array.isArray(d))continue;
-      const ms=[];
-      for(const e of d){
-        if(!e.markets?.length)continue;
-        const m=e.markets[0];
-        const loc=getLoc(e.title||m.question||'');
-        if(!loc)continue;
-        let prob=0.5;
-        try{const pr=typeof m.outcomePrices==='string'?m.outcomePrices.split(','):m.outcomePrices;prob=parseFloat(pr[0])||0.5}catch(x){}
-        ms.push({id:m.id||e.id,question:e.title||m.question,probability:prob,volume:parseFloat(m.volume||0),source:'polymarket',slug:e.slug,url:'https://polymarket.com/event/'+e.slug,...loc,category:getCat(e.title||m.question||'')});
-      }
-      if(ms.length>0)return ms;
-    }catch(x){}
-  }
-  return[];
-}
-
-async function fetchMani(){
-  try{
-    const r=await fetch('https://api.manifold.markets/v0/markets?limit=30&sort=liquidity',{signal:AbortSignal.timeout(8000)});
-    if(!r.ok)return[];
-    const d=await r.json();
-    const ms=[];
-    for(const m of d){
-      if(m.outcomeType!=='BINARY')continue;
-      const loc=getLoc(m.question||'');
-      if(!loc)continue;
-      ms.push({id:'mf-'+m.id,question:m.question,probability:m.probability||0.5,volume:m.volume||0,source:'manifold',url:m.url,...loc,category:getCat(m.question||'')});
-    }
-    return ms;
-  }catch(x){return[]}
-}
+async function fetchPoly(){for(const p of PROXIES){try{const url=p?p+encodeURIComponent('https://gamma-api.polymarket.com/events?closed=false&active=true&limit=50'):'https://gamma-api.polymarket.com/events?closed=false&active=true&limit=50';const r=await fetch(url,{signal:AbortSignal.timeout(8000)});if(!r.ok)continue;const d=await r.json();if(!Array.isArray(d))continue;const ms=[];for(const e of d){if(!e.markets?.length)continue;const m=e.markets[0];const loc=getLoc(e.title||m.question||'');if(!loc)continue;let prob=0.5;try{const pr=typeof m.outcomePrices==='string'?m.outcomePrices.split(','):m.outcomePrices;prob=parseFloat(pr[0])||0.5}catch(x){}ms.push({id:m.id||e.id,question:e.title||m.question,probability:prob,volume:parseFloat(m.volume||0),source:'polymarket',slug:e.slug,url:'https://polymarket.com/event/'+e.slug,...loc,category:getCat(e.title||m.question||'')});}if(ms.length>0)return ms}catch(x){}}return[]}
 
 function genArcs(ms){return ms.filter(m=>m.volume>1e6&&m.lat).slice(0,10).map((m,i)=>({startLat:38.9,startLng:-77,endLat:m.lat,endLng:m.lng,color:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.2)']:m.category==='Conflict'?['rgba(249,115,22,0.7)','rgba(249,115,22,0.2)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.2)'],stroke:0.8,dashLength:0.4,dashGap:0.2,dashAnimateTime:1500+i*200,altitude:0.1+(i%3)*0.05}))}
-
 function genRings(ms,hl){const rs=ms.filter(m=>m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:m.category==='Trump'?3:2,propagationSpeed:1.5,repeatPeriod:1200+i*200,color:m.probability>0.6?'rgba(34,197,94,0.5)':m.probability<0.4?'rgba(239,68,68,0.5)':'rgba(245,158,11,0.5)'}));if(hl)rs.unshift({lat:hl.lat,lng:hl.lng,maxR:5,propagationSpeed:3,repeatPeriod:800,color:'rgba(255,255,255,0.6)'});return rs}
-
 function genActs(ms){const a=[];const acts=['BUY','SELL'];const amts=[500,1000,2500,5000,10000,25000];for(let i=0;i<12;i++){const m=ms[Math.floor(Math.random()*Math.min(ms.length,15))];if(!m)continue;const amt=amts[Math.floor(Math.random()*amts.length)];a.push({id:'a-'+i,market:m.question.substring(0,35)+'...',action:acts[Math.floor(Math.random()*2)],amount:amt,isWhale:amt>=10000,time:new Date(Date.now()-Math.random()*300000),source:m.source})}return a.sort((x,y)=>y.time-x.time)}
 
 function App(){
-  const globeEl=useRef();
-  const[markets,setMarkets]=useState(MARKETS);
-  const[news]=useState(NEWS);
-  const[activities,setActivities]=useState(()=>genActs(MARKETS));
-  const[loading,setLoading]=useState(true);
-  const[dataSource,setDataSource]=useState('sample');
-  const[selected,setSelected]=useState(null);
-  const[highlighted,setHighlighted]=useState(null);
-  const[search,setSearch]=useState('');
-  const[srcFilter,setSrcFilter]=useState('all');
-  const[catFilter,setCatFilter]=useState('All');
-  const[tab,setTab]=useState('activity');
-  const[countries,setCountries]=useState({features:[]});
-  const[lastUpd]=useState(new Date());
+const globeEl=useRef();
+const[markets,setMarkets]=useState(MARKETS);
+const[news,setNews]=useState([]);
+const[newsLoading,setNewsLoading]=useState(true);
+const[activities,setActivities]=useState(()=>genActs(MARKETS));
+const[loading,setLoading]=useState(true);
+const[dataSource,setDataSource]=useState('sample');
+const[selected,setSelected]=useState(null);
+const[highlighted,setHighlighted]=useState(null);
+const[search,setSearch]=useState('');
+const[srcFilter,setSrcFilter]=useState('all');
+const[catFilter,setCatFilter]=useState('All');
+const[tab,setTab]=useState('news');
+const[countries,setCountries]=useState({features:[]});
+const[lastUpd,setLastUpd]=useState(new Date());
 
-  useEffect(()=>{
-    setLoading(false);
-    (async()=>{
-      try{
-        const[p,m]=await Promise.all([fetchPoly(),fetchMani()]);
-        const live=[...p,...m].sort((a,b)=>b.volume-a.volume);
-        if(live.length>5){setMarkets(live);setActivities(genActs(live));setDataSource('live')}
-      }catch(x){}
-    })();
-    setTimeout(()=>{fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson').then(r=>r.json()).then(d=>setCountries(d)).catch(()=>{})},2000);
-  },[]);
+useEffect(()=>{
+const loadNews=async()=>{setNewsLoading(true);try{const n=await fetchNews();if(n.length>0){setNews(n);console.log('Loaded',n.length,'news')}}catch(e){}setNewsLoading(false)};
+loadNews();
+const i=setInterval(loadNews,300000);
+return()=>clearInterval(i);
+},[]);
 
-  useEffect(()=>{if(markets.length===0)return;const i=setInterval(()=>{const c=markets.filter(m=>m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);setTimeout(()=>setHighlighted(null),4000)}},8000);return()=>clearInterval(i)},[markets]);
+useEffect(()=>{
+setLoading(false);
+(async()=>{try{const p=await fetchPoly();if(p.length>5){setMarkets(p);setActivities(genActs(p));setDataSource('live');setLastUpd(new Date())}}catch(x){}})();
+setTimeout(()=>{fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson').then(r=>r.json()).then(d=>setCountries(d)).catch(()=>{})},2000);
+},[]);
 
-  useEffect(()=>{if(!globeEl.current||loading)return;globeEl.current.controls().autoRotate=true;globeEl.current.controls().autoRotateSpeed=0.3;globeEl.current.pointOfView({lat:25,lng:0,altitude:2.2},1500)},[loading]);
+useEffect(()=>{if(markets.length===0)return;const i=setInterval(()=>{const c=markets.filter(m=>m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);setTimeout(()=>setHighlighted(null),4000)}},8000);return()=>clearInterval(i)},[markets]);
 
-  useEffect(()=>{if(!globeEl.current)return;if(selected){globeEl.current.controls().autoRotate=false;globeEl.current.pointOfView({lat:selected.lat,lng:selected.lng,altitude:1.5},800)}else if(highlighted){globeEl.current.pointOfView({lat:highlighted.lat,lng:highlighted.lng,altitude:2},1500)}},[selected,highlighted]);
+useEffect(()=>{if(!globeEl.current||loading)return;globeEl.current.controls().autoRotate=true;globeEl.current.controls().autoRotateSpeed=0.3;globeEl.current.pointOfView({lat:25,lng:0,altitude:2.2},1500)},[loading]);
 
-  const filtered=useMemo(()=>markets.filter(m=>{if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(srcFilter!=='all'&&m.source!==srcFilter)return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,srcFilter,catFilter]);
+useEffect(()=>{if(!globeEl.current)return;if(selected){globeEl.current.controls().autoRotate=false;globeEl.current.pointOfView({lat:selected.lat,lng:selected.lng,altitude:1.5},800)}else if(highlighted){globeEl.current.pointOfView({lat:highlighted.lat,lng:highlighted.lng,altitude:2},1500)}},[selected,highlighted]);
 
-  const stats=useMemo(()=>({total:markets.length,volume:markets.reduce((s,m)=>s+m.volume,0),poly:markets.filter(m=>m.source==='polymarket').length,mf:markets.filter(m=>m.source==='manifold').length}),[markets]);
+const filtered=useMemo(()=>markets.filter(m=>{if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(srcFilter!=='all'&&m.source!==srcFilter)return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,srcFilter,catFilter]);
+const stats=useMemo(()=>({total:markets.length,volume:markets.reduce((s,m)=>s+m.volume,0),poly:markets.filter(m=>m.source==='polymarket').length,mf:markets.filter(m=>m.source==='manifold').length}),[markets]);
+const arcs=useMemo(()=>genArcs(filtered),[filtered]);
+const rings=useMemo(()=>genRings(filtered,highlighted),[filtered,highlighted]);
+const ticker=useMemo(()=>{if(news.length===0)return['Loading live news...','Loading live news...'];const t=news.slice(0,12).map(n=>n.source+': '+n.title);return[...t,...t]},[news]);
+const cats=['All','Trump','Politics','Conflict','Economy','Trade'];
 
-  const arcs=useMemo(()=>genArcs(filtered),[filtered]);
-  const rings=useMemo(()=>genRings(filtered,highlighted),[filtered,highlighted]);
-  const ticker=useMemo(()=>{const t=news.map(n=>n.title);return[...t,...t]},[news]);
+if(loading)return<div className="loading"><div className="loading-icon">⚡</div><h2 style={{marginTop:16,fontSize:24,fontWeight:800}}>ConnecTHOR v2.0</h2></div>;
 
-  const cats=['All','Trump','Politics','Conflict','Economy','Trade'];
+return(
+<div className="app">
+<header className="header">
+<div className="logo"><span className="logo-icon">⚡</span><h1>ConnecTHOR</h1></div>
+<div className="stats">
+<div className="stat"><div className="stat-val">{stats.total}</div><div className="stat-lbl">Markets</div></div>
+<div className="stat"><div className="stat-val">{fmtVol(stats.volume)}</div><div className="stat-lbl">Volume</div></div>
+<div className="stat"><div className="stat-val live"><span className="dot"></span>{dataSource==='live'?'LIVE':'SAMPLE'}</div><div className="stat-lbl">{fmtTime(lastUpd)}</div></div>
+</div>
+<input type="text" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{background:'rgba(15,23,42,0.9)',border:'1px solid rgba(71,85,105,0.4)',borderRadius:8,padding:'8px 12px',color:'white',width:160,fontSize:13}}/>
+</header>
 
-  if(loading)return<div className="loading"><div className="loading-icon">⚡</div><h2 style={{marginTop:16,fontSize:24,fontWeight:800}}>ConnecTHOR v2.0</h2></div>;
+<aside className="left">
+<div className="panel-hd"><span className="panel-title">📊 Markets</span><span className="badge">{filtered.length}</span></div>
+<div className="tabs">
+<button className={`tab ${srcFilter==='all'?'active':''}`} onClick={()=>setSrcFilter('all')}>All</button>
+<button className={`tab ${srcFilter==='polymarket'?'active':''}`} onClick={()=>setSrcFilter('polymarket')}>Poly</button>
+<button className={`tab ${srcFilter==='manifold'?'active':''}`} onClick={()=>setSrcFilter('manifold')}>Manifold</button>
+</div>
+<div className="tabs">{cats.map(c=><button key={c} className={`tab ${catFilter===c?'active':''}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
+<div className="list">
+{filtered.slice(0,25).map(m=>(
+<div key={m.id} className={`card ${selected?.id===m.id?'sel':''}`} onClick={()=>setSelected(m)}>
+<div className="src">{m.source==='polymarket'?'◆ Polymarket':'◇ Manifold'}</div>
+<div className="q">{m.question}</div>
+<div className="row"><span className={`prob ${m.probability>=0.7?'hi':m.probability>=0.4?'md':'lo'}`}>{fmtProb(m.probability)}</span><span className="vol">{fmtVol(m.volume)}</span></div>
+</div>
+))}
+</div>
+</aside>
 
-  return(
-    <div className="app">
-      <header className="header">
-        <div className="logo"><span className="logo-icon">⚡</span><h1>ConnecTHOR</h1></div>
-        <div className="stats">
-          <div className="stat"><div className="stat-val">{stats.total}</div><div className="stat-lbl">Markets</div></div>
-          <div className="stat"><div className="stat-val">{fmtVol(stats.volume)}</div><div className="stat-lbl">Volume</div></div>
-          <div className="stat"><div className="stat-val live"><span className="dot"></span>{dataSource==='live'?'LIVE':'SAMPLE'}</div><div className="stat-lbl">{fmtTime(lastUpd)}</div></div>
-        </div>
-        <input type="text" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{background:'rgba(15,23,42,0.9)',border:'1px solid rgba(71,85,105,0.4)',borderRadius:8,padding:'8px 12px',color:'white',width:160,fontSize:13}}/>
-      </header>
+<main className="globe">
+<div className="badge-api"><span className="dot" style={{width:6,height:6}}></span>{dataSource==='live'?'Live API':'Sample'}</div>
 
-      <aside className="left">
-        <div className="panel-hd"><span className="panel-title">📊 Markets</span><span className="badge">{filtered.length}</span></div>
-        <div className="tabs">
-          <button className={`tab ${srcFilter==='all'?'active':''}`} onClick={()=>setSrcFilter('all')}>All</button>
-          <button className={`tab ${srcFilter==='polymarket'?'active':''}`} onClick={()=>setSrcFilter('polymarket')}>Poly</button>
-          <button className={`tab ${srcFilter==='manifold'?'active':''}`} onClick={()=>setSrcFilter('manifold')}>Manifold</button>
-        </div>
-        <div className="tabs">{cats.map(c=><button key={c} className={`tab ${catFilter===c?'active':''}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
-        <div className="list">
-          {filtered.slice(0,25).map(m=>(
-            <div key={m.id} className={`card ${selected?.id===m.id?'sel':''}`} onClick={()=>setSelected(m)}>
-              <div className="src">{m.source==='polymarket'?'◆ Polymarket':'◇ Manifold'}</div>
-              <div className="q">{m.question}</div>
-              <div className="row"><span className={`prob ${m.probability>=0.7?'hi':m.probability>=0.4?'md':'lo'}`}>{fmtProb(m.probability)}</span><span className="vol">{fmtVol(m.volume)}</span></div>
-            </div>
-          ))}
-        </div>
-      </aside>
+{highlighted&&!selected&&(
+<div className="spotlight" onClick={()=>setSelected(highlighted)}>
+<div className="spot-dot"></div>
+<span className="spot-lbl">SPOTLIGHT</span>
+<span className="spot-txt">{highlighted.question.substring(0,40)}...</span>
+<span className="spot-prob" style={{color:highlighted.probability>=0.6?'var(--green)':highlighted.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(highlighted.probability)}</span>
+</div>
+)}
 
-      <main className="globe">
-        <div className="badge-api"><span className="dot" style={{width:6,height:6}}></span>{dataSource==='live'?'Live API':'Sample'}</div>
-        
-        {highlighted&&!selected&&(
-          <div className="spotlight" onClick={()=>setSelected(highlighted)}>
-            <div className="spot-dot"></div>
-            <span className="spot-lbl">SPOTLIGHT</span>
-            <span className="spot-txt">{highlighted.question.substring(0,40)}...</span>
-            <span className="spot-prob" style={{color:highlighted.probability>=0.6?'var(--green)':highlighted.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(highlighted.probability)}</span>
-          </div>
-        )}
+{selected&&(
+<div className="detail">
+<div className="detail-hd"><div className="detail-q">{selected.question}</div><button className="detail-close" onClick={()=>setSelected(null)}>✕</button></div>
+<div className="detail-stats">
+<div className="detail-stat"><div className="detail-val" style={{color:selected.probability>=0.6?'var(--green)':selected.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(selected.probability)}</div><div className="detail-lbl">Probability</div></div>
+<div className="detail-stat"><div className="detail-val">{fmtVol(selected.volume)}</div><div className="detail-lbl">Volume</div></div>
+<div className="detail-stat"><div className="detail-val">{selected.country}</div><div className="detail-lbl">Location</div></div>
+</div>
+{selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on {selected.source==='polymarket'?'Polymarket':'Manifold'} →</a>}
+</div>
+)}
 
-        {selected&&(
-          <div className="detail">
-            <div className="detail-hd"><div className="detail-q">{selected.question}</div><button className="detail-close" onClick={()=>setSelected(null)}>✕</button></div>
-            <div className="detail-stats">
-              <div className="detail-stat"><div className="detail-val" style={{color:selected.probability>=0.6?'var(--green)':selected.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(selected.probability)}</div><div className="detail-lbl">Probability</div></div>
-              <div className="detail-stat"><div className="detail-val">{fmtVol(selected.volume)}</div><div className="detail-lbl">Volume</div></div>
-              <div className="detail-stat"><div className="detail-val">{selected.country}</div><div className="detail-lbl">Location</div></div>
-            </div>
-            {selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on {selected.source==='polymarket'?'Polymarket':'Manifold'} →</a>}
-          </div>
-        )}
+<Globe ref={globeEl} globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg" bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png" polygonsData={countries.features||[]} polygonCapColor={()=>'rgba(0,0,0,0)'} polygonSideColor={()=>'rgba(100,150,200,0.05)'} polygonStrokeColor={()=>'rgba(100,180,255,0.3)'} polygonAltitude={0.005} pointsData={filtered} pointLat="lat" pointLng="lng" pointAltitude={d=>Math.min(0.05+d.volume/50000000,0.18)} pointRadius={d=>(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35} pointColor={d=>d.category==='Trump'?'#dc2626':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'} pointLabel={d=>'<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">'+d.source.toUpperCase()+' • '+d.country+'</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">'+d.question+'</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">'+fmtProb(d.probability)+'</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">'+fmtVol(d.volume)+'</div></div></div></div>'} onPointClick={setSelected} arcsData={arcs} arcStartLat="startLat" arcStartLng="startLng" arcEndLat="endLat" arcEndLng="endLng" arcColor="color" arcAltitude="altitude" arcStroke="stroke" arcDashLength="dashLength" arcDashGap="dashGap" arcDashAnimateTime="dashAnimateTime" ringsData={rings} ringLat="lat" ringLng="lng" ringMaxRadius="maxR" ringPropagationSpeed="propagationSpeed" ringRepeatPeriod="repeatPeriod" ringColor="color" atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>
+</main>
 
-        <Globe
-          ref={globeEl}
-          globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg"
-          bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png"
-          backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png"
-          polygonsData={countries.features||[]}
-          polygonCapColor={()=>'rgba(0,0,0,0)'}
-          polygonSideColor={()=>'rgba(100,150,200,0.05)'}
-          polygonStrokeColor={()=>'rgba(100,180,255,0.3)'}
-          polygonAltitude={0.005}
-          pointsData={filtered}
-          pointLat="lat"
-          pointLng="lng"
-          pointAltitude={d=>Math.min(0.05+d.volume/50000000,0.18)}
-          pointRadius={d=>(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35}
-          pointColor={d=>d.category==='Trump'?'#dc2626':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'}
-          pointLabel={d=>`<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">${d.source.toUpperCase()} • ${d.country}</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">${d.question}</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">${fmtProb(d.probability)}</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">${fmtVol(d.volume)}</div></div></div></div>`}
-          onPointClick={setSelected}
-          arcsData={arcs}
-          arcStartLat="startLat"
-          arcStartLng="startLng"
-          arcEndLat="endLat"
-          arcEndLng="endLng"
-          arcColor="color"
-          arcAltitude="altitude"
-          arcStroke="stroke"
-          arcDashLength="dashLength"
-          arcDashGap="dashGap"
-          arcDashAnimateTime="dashAnimateTime"
-          ringsData={rings}
-          ringLat="lat"
-          ringLng="lng"
-          ringMaxRadius="maxR"
-          ringPropagationSpeed="propagationSpeed"
-          ringRepeatPeriod="repeatPeriod"
-          ringColor="color"
-          atmosphereColor="#3b82f6"
-          atmosphereAltitude={0.12}
-        />
-      </main>
+<aside className="right">
+<div className="act-tabs">
+<button className={`act-tab ${tab==='activity'?'active':''}`} onClick={()=>setTab('activity')}>🔴 Activity</button>
+<button className={`act-tab ${tab==='news'?'active':''}`} onClick={()=>setTab('news')}>📰 Live News</button>
+</div>
+{tab==='activity'?(
+<div className="feed">
+{activities.map(a=>(
+<div key={a.id} className={`act ${a.isWhale?'whale':''}`}>
+<span className="act-icon">{a.isWhale?'🐋':a.action==='BUY'?'📈':'📉'}</span>
+<div className="act-content"><div className="act-title">{a.market}</div><div className="act-meta"><span className={`act-amt ${a.action.toLowerCase()}`}>{a.action} ${a.amount.toLocaleString()}</span> • {a.source}</div></div>
+<span className="act-time">{fmtTime(a.time)}</span>
+</div>
+))}
+</div>
+):(
+<div className="feed">
+{newsLoading?<div className="news-loading">⏳ Loading live news...</div>:news.length===0?<div className="news-loading">No news. Retry in 5min.</div>:news.slice(0,15).map(n=>(
+<a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer" className={`news ${n.isBreaking?'breaking':''}`}>
+<div className="news-src">{n.isBreaking&&'🔴 '}{n.source}</div>
+<div className="news-title">{n.title}</div>
+<div className="news-time">{fmtTime(n.time)}</div>
+</a>
+))}
+</div>
+)}
+</aside>
 
-      <aside className="right">
-        <div className="act-tabs">
-          <button className={`act-tab ${tab==='activity'?'active':''}`} onClick={()=>setTab('activity')}>🔴 Activity</button>
-          <button className={`act-tab ${tab==='news'?'active':''}`} onClick={()=>setTab('news')}>📰 News</button>
-        </div>
-        {tab==='activity'?(
-          <div className="feed">
-            {activities.map(a=>(
-              <div key={a.id} className={`act ${a.isWhale?'whale':''}`}>
-                <span className="act-icon">{a.isWhale?'🐋':a.action==='BUY'?'📈':'📉'}</span>
-                <div className="act-content"><div className="act-title">{a.market}</div><div className="act-meta"><span className={`act-amt ${a.action.toLowerCase()}`}>{a.action} ${a.amount.toLocaleString()}</span> • {a.source}</div></div>
-                <span className="act-time">{fmtTime(a.time)}</span>
-              </div>
-            ))}
-          </div>
-        ):(
-          <div className="feed">
-            {news.map(n=>(
-              <div key={n.id} className="news">
-                <div className="news-src">{n.source}</div>
-                <div className="news-title">{n.title}</div>
-                <div className="news-time">{fmtTime(n.time)}</div>
-              </div>
-            ))}
-          </div>
-        )}
-      </aside>
-
-      <div className="ticker">
-        <span className="ticker-lbl">🔴 LIVE</span>
-        <div className="ticker-scroll">{ticker.map((t,i)=><span key={i} className="ticker-item">{t}</span>)}</div>
-      </div>
-    </div>
-  );
+<div className="ticker">
+<span className="ticker-lbl"><span className="livedot"></span>BREAKING</span>
+<div className="ticker-scroll">{ticker.map((t,i)=><span key={i} className="ticker-item">{t}</span>)}</div>
+</div>
+</div>
+);
 }
 
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
