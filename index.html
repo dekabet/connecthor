@@ -592,12 +592,12 @@ const ARC_COLORS={Conflict:['rgba(249,115,22,0.8)','rgba(239,68,68,0.25)'],Trump
 function genArcs(ms,flows){
   const out=[],seen=new Set();
   ms.forEach(m=>(m.links||[]).forEach(l=>{const k=[m.country,l.country].sort().join('|');if(seen.has(k)||out.length>=40)return;seen.add(k);
-    out.push({startLat:m.lat,startLng:m.lng,endLat:l.lat,endLng:l.lng,color:ARC_COLORS[m.category]||['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.5+Math.min(m.vol24/2e6,1),dashLength:0.5,dashGap:0.15,dashAnimateTime:2000+out.length*137%1500,altitude:null})}));
+    out.push({startLat:m.lat,startLng:m.lng,endLat:l.lat,endLng:l.lng,color:ARC_COLORS[m.category]||['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.5+Math.min(m.vol24/2e6,1),dashLength:0.4,dashGap:0.25,dashAnimateTime:7000+out.length*373%3000,altitude:null})}));
   genArcsDC(ms.filter(m=>m.country!=='USA'&&!(m.links||[]).some(l=>l.country==='USA'))).forEach(a=>out.push(a));
   return out.concat(flows||[]);
 }
-function genArcsDC(ms){return ms.filter(m=>isUSD(m)&&m.volume>1e6&&m.lat).slice(0,6).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.4,dashLength:0.3,dashGap:0.3,dashAnimateTime:2500+i*200,altitude:0.1+(i%3)*0.05}))}
-function genRings(ms,hl,dc){const rs=ms.filter(m=>isUSD(m)&&m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:2,propagationSpeed:1.5,repeatPeriod:1200+i*200,color:tensionOf(m)>0.5&&m.category==='Conflict'?'rgba(239,68,68,0.5)':'rgba(59,130,246,0.4)'}));rs.push({lat:PENTAGON.lat,lng:PENTAGON.lng,maxR:2+(5-dc)*1.5,propagationSpeed:1+(5-dc)*0.8,repeatPeriod:Math.max(400,1600-(5-dc)*300),color:DOUGHCON[dc].color});if(hl)rs.unshift({lat:hl.lat,lng:hl.lng,maxR:5,propagationSpeed:3,repeatPeriod:800,color:'rgba(255,255,255,0.6)'});return rs}
+function genArcsDC(ms){return ms.filter(m=>isUSD(m)&&m.volume>1e6&&m.lat).slice(0,6).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.4,dashLength:0.3,dashGap:0.3,dashAnimateTime:9000+i*700,altitude:0.1+(i%3)*0.05}))}
+function genRings(ms,dc){const rs=ms.filter(m=>isUSD(m)&&m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:2,propagationSpeed:0.6,repeatPeriod:3500+i*400,color:tensionOf(m)>0.5&&m.category==='Conflict'?'rgba(239,68,68,0.45)':'rgba(59,130,246,0.35)'}));rs.push({lat:PENTAGON.lat,lng:PENTAGON.lng,maxR:2+(5-dc)*1.2,propagationSpeed:0.7+(5-dc)*0.35,repeatPeriod:Math.max(900,2800-(5-dc)*450),color:DOUGHCON[dc].color});return rs}
 function genActs(ms){const a=[];const amts=[500,1000,2500,5000,10000,25000];for(let i=0;i<14;i++){const m=ms[Math.floor(Math.random()*Math.min(ms.length,15))];if(!m)continue;const amt=amts[Math.floor(Math.random()*amts.length)];a.push({id:'a-'+i,market:m.question,action:Math.random()<0.5?'BUY':'SELL',amount:amt,isWhale:amt>=10000,time:new Date(Date.now()-Math.random()*300000),source:m.source})}return a.sort((x,y)=>y.time-x.time)}
 
 // ============ COMPONENTS ============
@@ -646,7 +646,7 @@ function Clock(){
   const[now,setNow]=useState(new Date());
   useEffect(()=>{const i=setInterval(()=>setNow(new Date()),1000);return()=>clearInterval(i)},[]);
   const f=tz=>now.toLocaleTimeString('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',second:'2-digit'});
-  return<><div className="stat"><div className="stat-val mono">{f('America/New_York')}</div><div className="stat-lbl">Washington DC</div></div><div className="stat"><div className="stat-val mono">{f('UTC')}</div><div className="stat-lbl">Zulu</div></div></>;
+  return<>{[['America/New_York','Washington DC'],['Europe/London','London'],['Europe/Berlin','Central Europe']].map(([tz,l])=><div key={tz} className="stat"><div className="stat-val mono">{f(tz)}</div><div className="stat-lbl">{l}</div></div>)}</>;
 }
 
 // Popular-times style bars: typical busyness per hour, current hour shows live value
@@ -817,7 +817,7 @@ if(fresh.length)setTrades(prev=>[...fresh,...prev].sort((a,b)=>b.time-a.time).sl
 if(!first){
 const byCond=new Map(marketsRef.current.map(m=>[m.conditionId,m]));const now=Date.now();
 const hits=fresh.map(t=>({t,m:byCond.get(t.conditionId)})).filter(x=>x.m).slice(0,20);
-if(hits.length)setPulses(ps=>[...ps.filter(p=>p.until>now),...hits.map(({t,m})=>({id:t.id,lat:m.lat,lng:m.lng,whale:t.usd>=WHALE_USD,side:t.side,until:now+(t.usd>=WHALE_USD?12000:5000)}))]);
+if(hits.length)setPulses(ps=>[...ps.filter(p=>p.until>now),...hits.map(({t,m})=>{const w=t.usd>=WHALE_USD;return{id:t.id,lat:m.lat,lng:m.lng,whale:w,side:t.side,until:now+(w?15000:8000),maxR:w?5:2.5,propagationSpeed:w?1.6:1,repeatPeriod:w?1600:2600,color:t.side==='SELL'?'#ef4444':'#22c55e'}})]);
 }
 first=false;
 }catch(e){setTradesLive(v=>v===null?false:v);console.log('Trades error:',e.message)}
@@ -839,14 +839,19 @@ setMarkets(ms=>ms.map(apply));setSelected(s=>s&&apply(s));
 // Price history for the selected market
 useEffect(()=>{setHistory(null);if(!selected?.tokenYes)return;let off=false;fetchHistory(selected.tokenYes).then(h=>{if(!off)setHistory(h)}).catch(()=>{if(!off)setHistory([])});return()=>{off=true}},[selected?.tokenYes]);
 
-useEffect(()=>{if(markets.length===0)return;const i=setInterval(()=>{const c=markets.filter(m=>isUSD(m)&&m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);setTimeout(()=>setHighlighted(null),4000)}},9000);return()=>clearInterval(i)},[markets]);
+const lastTouch=useRef(0);
+useEffect(()=>{if(markets.length===0)return;let off;const i=setInterval(()=>{if(Date.now()-lastTouch.current<45000)return;const c=marketsRef.current.filter(m=>isUSD(m)&&m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);off=setTimeout(()=>setHighlighted(null),8000)}},25000);return()=>{clearInterval(i);clearTimeout(off)}},[markets.length>0]);
 
 // Size the globe to its grid cell, not the window
 useEffect(()=>{const el=globeWrap.current;if(!el)return;const ro=new ResizeObserver(([e])=>setGsize({w:Math.round(e.contentRect.width),h:Math.round(e.contentRect.height)}));ro.observe(el);return()=>ro.disconnect()},[]);
 
-useEffect(()=>{if(!globeEl.current)return;const c=globeEl.current.controls();c.autoRotate=true;c.autoRotateSpeed=0.3;globeEl.current.pointOfView({lat:30,lng:-40,altitude:2.2},1500)},[gsize.w>0]);
+useEffect(()=>{if(!globeEl.current)return;const c=globeEl.current.controls();c.autoRotate=true;c.autoRotateSpeed=0.12;c.enableDamping=true;c.dampingFactor=0.08;
+const touch=()=>{lastTouch.current=Date.now();setHighlighted(null)};c.addEventListener('start',touch);
+globeEl.current.pointOfView({lat:30,lng:-40,altitude:2.3},2500);return()=>c.removeEventListener('start',touch)},[gsize.w>0]);
 
-useEffect(()=>{if(!globeEl.current)return;if(selected){globeEl.current.controls().autoRotate=false;globeEl.current.pointOfView({lat:selected.lat,lng:selected.lng,altitude:1.5},800)}else if(highlighted){globeEl.current.pointOfView({lat:highlighted.lat,lng:highlighted.lng,altitude:2},1500)}},[selected,highlighted]);
+useEffect(()=>{if(!globeEl.current)return;const c=globeEl.current.controls();
+if(selected){c.autoRotate=false;globeEl.current.pointOfView({lat:selected.lat,lng:selected.lng,altitude:1.6},2000)}
+else{c.autoRotate=true;if(highlighted)globeEl.current.pointOfView({lat:highlighted.lat,lng:highlighted.lng,altitude:2.3},4000)}},[selected?.id,highlighted?.id]);
 
 const filtered=useMemo(()=>markets.filter(m=>{if(srcFilter!=='all'&&m.source!==srcFilter)return false;if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,catFilter,srcFilter]);
 const stats=useMemo(()=>({total:markets.length,volume:markets.filter(isUSD).reduce((s,m)=>s+m.volume,0)}),[markets]);
@@ -854,12 +859,19 @@ const neh=useMemo(()=>nehIndex(markets),[markets]);
 const nehPrev=useMemo(()=>nehIndex(markets.map(m=>({...m,probability:Math.min(1,Math.max(0,m.probability-(m.change24||0)))}))).score,[markets]);
 const movers=useMemo(()=>[...markets].filter(m=>m.change24).sort((a,b)=>Math.abs(b.change24)-Math.abs(a.change24)).slice(0,5),[markets]);
 const whales=useMemo(()=>trades.filter(t=>t.usd>=WHALE_USD).slice(0,5),[trades]);
-const flowArcs=useMemo(()=>pulses.filter(p=>p.whale).map(p=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:p.lat,endLng:p.lng,color:p.side==='SELL'?['rgba(239,68,68,0.1)','rgba(239,68,68,0.95)']:['rgba(34,197,94,0.1)','rgba(34,197,94,0.95)'],stroke:1.4,dashLength:1,dashGap:0,dashAnimateTime:0,altitude:0.35})),[pulses]);
+const whaleKey=pulses.filter(p=>p.whale).map(p=>p.id).join('|');
+const flowArcs=useMemo(()=>pulses.filter(p=>p.whale).map(p=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:p.lat,endLng:p.lng,color:p.side==='SELL'?['rgba(239,68,68,0.1)','rgba(239,68,68,0.95)']:['rgba(34,197,94,0.1)','rgba(34,197,94,0.95)'],stroke:1.4,dashLength:1,dashGap:0,dashAnimateTime:0,altitude:0.35})),[whaleKey]);
 const nl=nehLabel(neh.score);
 const dc=pizza?doughconFor(pizza.index):5;
-const arcs=useMemo(()=>genArcs(filtered,flowArcs),[filtered,flowArcs]);
-const rings=useMemo(()=>[...genRings(filtered,highlighted,dc),...pulses.map(p=>({lat:p.lat,lng:p.lng,maxR:p.whale?6:2.5,propagationSpeed:p.whale?4:3,repeatPeriod:p.whale?500:900,color:p.side==='SELL'?'#ef4444':'#22c55e'}))],[filtered,highlighted,dc,pulses]);
+// Rebuilding arc/ring objects restarts their animations, so key them on which markets are shown, not on prices
+const shownKey=filtered.map(m=>m.id).join('|');
+const baseArcs=useMemo(()=>genArcs(filtered),[shownKey]);
+const arcs=useMemo(()=>flowArcs.length?baseArcs.concat(flowArcs):baseArcs,[baseArcs,flowArcs]);
+const baseRings=useMemo(()=>genRings(filtered,dc),[shownKey,dc]);
+const hlRing=useMemo(()=>highlighted?[{lat:highlighted.lat,lng:highlighted.lng,maxR:4,propagationSpeed:1,repeatPeriod:2200,color:'rgba(255,255,255,0.5)'}]:[],[highlighted?.id]);
+const rings=useMemo(()=>[...hlRing,...baseRings,...pulses],[hlRing,baseRings,pulses]);
 const shopPoints=useMemo(()=>(pizza?.shops||[]).map(s=>({...s,isShop:true})),[pizza]);
+const globePoints=useMemo(()=>[...filtered,...shopPoints],[filtered,shopPoints]);
 const ticker=useMemo(()=>{const head=[`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`,`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`,...movers.slice(0,3).map(m=>`${m.change24>0?'📈':'📉'} ${m.question} ${fmtProb(m.probability)} (${fmtChg(m.change24)} 24h)`),...whales.slice(0,2).map(t=>`🐋 ${fmtVol(t.usd)} ${t.side} ${t.outcome} — ${t.title}`)];if(news.length===0)return[...head,'Loading live news...',...head,'Loading live news...'];const t=[...head,...news.slice(0,15).map(n=>(n.isBreaking?'🔴 ':'')+n.source+': '+n.title)];return[...t,...t]},[news,dc,neh.score,movers,whales]);
 const cats=['All','Conflict','Trump','Politics','Economy','Trade'];
 const srcCounts=useMemo(()=>{const c={};markets.forEach(m=>c[m.source]=(c[m.source]||0)+1);return c},[markets]);
@@ -921,10 +933,10 @@ return(
 {selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on {srcName(selected.source)} →</a>}
 </div>)}
 
-<Boundary name="Globe">{gsize.w>0&&!HAS_WEBGL&&<><FlatMap w={gsize.w} h={gsize.h} countries={countries.features} points={[...filtered,...shopPoints]} arcs={arcs} selected={selected} onSelect={setSelected} dcColor={DOUGHCON[dc].color}/><div className="note" style={{position:'absolute',left:12,bottom:4,right:12,zIndex:40,color:'#94a3b8'}}>2D view: your browser has WebGL turned off, so the 3D globe can't run. In Brave, enable <b>Settings → System → Use graphics acceleration when available</b> and restart the browser.</div></>}
+<Boundary name="Globe">{gsize.w>0&&!HAS_WEBGL&&<><FlatMap w={gsize.w} h={gsize.h} countries={countries.features} points={globePoints} arcs={arcs} selected={selected} onSelect={setSelected} dcColor={DOUGHCON[dc].color}/><div className="note" style={{position:'absolute',left:12,bottom:4,right:12,zIndex:40,color:'#94a3b8'}}>2D view: your browser has WebGL turned off, so the 3D globe can't run. In Brave, enable <b>Settings → System → Use graphics acceleration when available</b> and restart the browser.</div></>}
 {gsize.w>0&&HAS_WEBGL&&<Globe ref={globeEl} width={gsize.w} height={gsize.h} globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg" bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="https://unpkg.com/three-globe/example/img/night-sky.png"
 polygonsData={countries.features||[]} polygonCapColor={()=>'rgba(0,0,0,0)'} polygonSideColor={()=>'rgba(100,150,200,0.05)'} polygonStrokeColor={()=>'rgba(100,180,255,0.25)'} polygonAltitude={0.005}
-pointsData={[...filtered,...shopPoints]} pointLat="lat" pointLng="lng"
+pointsData={globePoints} pointLat="lat" pointLng="lng"
 pointAltitude={d=>d.isShop?0.01+(d.ratio||0)*0.02:Math.min(0.05+(isUSD(d)?d.volume:d.volume/100)/50000000,0.18)}
 pointRadius={d=>d.isShop?0.12:(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35}
 pointColor={d=>d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'}
@@ -988,7 +1000,7 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
 
 <Boundary name="Ticker" className="ticker"><div className="ticker">
 <span className="ticker-lbl"><span className="livedot"></span>BREAKING</span>
-<div className="ticker-scroll">{ticker.map((t,i)=><span key={i} className="ticker-item">{t}</span>)}</div>
+<div className="ticker-scroll" style={{animationDuration:Math.max(60,ticker.join('').length*0.09)+'s'}}>{ticker.map((t,i)=><span key={i} className="ticker-item">{t}</span>)}</div>
 </div></Boundary>
 </div>
 );
