@@ -74,6 +74,16 @@ All public and keyless; every REST call tries a direct request first, then falls
 | Data API | `data-api.polymarket.com/trades` (polled every 15s) | Real trade flow, whale filter (≥ $5K), globe pulses and whale arcs, ticker |
 | CLOB REST | `clob.polymarket.com/prices-history` | 7-day price chart in the market detail panel |
 
+### Other prediction markets
+
+| Venue | Endpoint | Notes |
+|---|---|---|
+| Kalshi | `api.elections.kalshi.com/trade-api/v2/events` | US-regulated, real money; politics/world/economics events only |
+| Manifold | `api.manifold.markets/v0/search-markets` | Play money (Ṁ) — shown but excluded from the NEH index and $ totals |
+| PredictIt | `www.predictit.org/api/marketdata/all/` | US politics, prices only (no volume) |
+
+The market detail panel lists **the same question on other venues** with the odds gap, e.g. Polymarket 40% vs Kalshi 34% (−6). The Markets tab filters by venue.
+
 Globe arcs connect every location a market mentions (e.g. *Israel strike on Iran* draws Israel ↔ Iran). If Polymarket is unreachable the page falls back to sample markets and a clearly labelled simulated flow.
 
 ## 🛠️ Customization

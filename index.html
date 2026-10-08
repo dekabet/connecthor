@@ -493,12 +493,90 @@ function useLivePrices(tokens,onPrices){
   return status;
 }
 
+// ============ OTHER PREDICTION MARKETS ============
+// Kalshi (US-regulated, real money), Manifold (play money "mana"), PredictIt (US politics).
+// All public, read-only and keyless; same direct-then-proxy fallback as Polymarket.
+const SOURCES={
+  polymarket:{name:'Polymarket',icon:'◆',cur:'USD'},
+  kalshi:{name:'Kalshi',icon:'▲',cur:'USD'},
+  manifold:{name:'Manifold',icon:'◇',cur:'MANA'},
+  predictit:{name:'PredictIt',icon:'●',cur:'USD'},
+};
+const srcName=s=>SOURCES[s]?.name||s;
+const isUSD=m=>SOURCES[m.source]?.cur!=='MANA';
+const fmtMoney=(v,src)=>SOURCES[src]?.cur==='MANA'?'Ṁ'+fmtVol(v).slice(1):fmtVol(v);
+// Kalshi prices come as integer cents, newer responses also as "_dollars" strings
+const kPrice=(m,k)=>m[k+'_dollars']!=null?num(m[k+'_dollars']):num(m[k])/100;
+
+const KALSHI='https://api.elections.kalshi.com/trade-api/v2';
+const KALSHI_CATS=/politic|election|world|econom|geopolit/i;
+async function fetchKalshi(){
+  const out=[];let cursor='';
+  for(let page=0;page<3;page++){
+    const d=await getJSON(`${KALSHI}/events?status=open&with_nested_markets=true&limit=200${cursor?'&cursor='+encodeURIComponent(cursor):''}`,10000);
+    (d.events||[]).forEach(e=>{
+      if(e.category&&!KALSHI_CATS.test(e.category))return;
+      const ms=(e.markets||[]).filter(m=>!m.status||m.status==='active'||m.status==='open');if(!ms.length)return;
+      const m=ms.length===1?ms[0]:[...ms].sort((a,b)=>num(b.volume)-num(a.volume))[0];
+      const sub=ms.length>1?(m.yes_sub_title||m.subtitle||''):'';
+      const question=(e.title||m.title||'')+(sub&&!(e.title||'').includes(sub)?' — '+sub:'');
+      const loc=getLoc(question+' '+(e.sub_title||''));if(!loc)return;
+      const bid=kPrice(m,'yes_bid'),ask=kPrice(m,'yes_ask'),last=kPrice(m,'last_price'),prev=kPrice(m,'previous_price');
+      const p=displayPrice(bid,ask,last||(bid+ask)/2);if(!(p>0))return;
+      // Kalshi contracts pay $1, so contract counts ≈ dollars traded
+      out.push({id:'k-'+m.ticker,source:'kalshi',question,eventTitle:e.title,probability:p,bid,ask,change24:prev>0?p-prev:0,
+        volume:num(m.volume),vol24:num(m.volume_24h),liquidity:kPrice(m,'liquidity'),endDate:m.close_time,
+        url:'https://kalshi.com/markets/'+String(e.series_ticker||m.event_ticker||'').toLowerCase(),...loc,category:getCat(question)});
+    });
+    cursor=d.cursor;if(!cursor)break;
+  }
+  return out;
+}
+
+const MANIFOLD='https://api.manifold.markets/v0';
+const MANIFOLD_TERMS=['ukraine','russia','china','taiwan','iran','israel','gaza','north korea','nuclear','war','nato','venezuela','trump','tariff'];
+async function fetchManifold(){
+  const res=await Promise.allSettled(MANIFOLD_TERMS.map(t=>getJSON(`${MANIFOLD}/search-markets?term=${encodeURIComponent(t)}&filter=open&sort=liquidity&contractType=BINARY&limit=15`)));
+  const byId=new Map();
+  res.forEach(r=>{if(r.status==='fulfilled'&&Array.isArray(r.value))r.value.forEach(m=>{
+    if(byId.has(m.id)||m.isResolved||m.outcomeType!=='BINARY'||typeof m.probability!=='number')return;
+    const loc=getLoc(m.question||'');if(!loc)return;
+    byId.set(m.id,{id:'mf-'+m.id,source:'manifold',question:m.question,probability:m.probability,change24:0,volume:num(m.volume),vol24:num(m.volume24Hours),liquidity:num(m.totalLiquidity),
+      endDate:m.closeTime,url:m.url||('https://manifold.markets/'+m.creatorUsername+'/'+m.slug),...loc,category:getCat(m.question)});
+  })});
+  if(!byId.size&&res.every(r=>r.status==='rejected'))throw res[0].reason;
+  return[...byId.values()];
+}
+
+async function fetchPredictIt(){
+  const d=await getJSON('https://www.predictit.org/api/marketdata/all/',12000);
+  const out=[];
+  (d.markets||[]).forEach(mk=>{
+    const cs=(mk.contracts||[]).filter(c=>c.status!=='Closed'&&c.lastTradePrice!=null);if(!cs.length)return;
+    const c=cs.length===1?cs[0]:[...cs].sort((a,b)=>num(b.lastTradePrice)-num(a.lastTradePrice))[0];
+    const question=cs.length===1?mk.name:(mk.name+' — '+(c.shortName||c.name));
+    const loc=getLoc(question);if(!loc)return;
+    const bid=num(c.bestSellYesCost),ask=num(c.bestBuyYesCost),last=num(c.lastTradePrice),p=displayPrice(bid,ask,last);
+    out.push({id:'pi-'+c.id,source:'predictit',question,probability:p,bid,ask,change24:c.lastClosePrice!=null?p-num(c.lastClosePrice):0,volume:0,vol24:0,
+      endDate:c.dateEnd&&c.dateEnd!=='N/A'?c.dateEnd:null,url:mk.url,...loc,category:getCat(question)});
+  });
+  return out;
+}
+
+// Same question on another venue: word overlap between questions
+const STOP=new Set('will the a an of in on by to be is it its before after end and or for at with than more less yes no who what when this that from into over under does do has have been any next least most'.split(' '));
+const toks=q=>new Set(q.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2&&!STOP.has(w)&&!/^20\d\d$/.test(w)));
+function similarMarkets(m,all){
+  const a=toks(m.question);if(a.size<2)return[];
+  return all.filter(x=>x.source!==m.source).map(x=>{const b=toks(x.question);let n=0;a.forEach(w=>{if(b.has(w))n++});return{m:x,score:n/(a.size+b.size-n)}}).filter(x=>x.score>=0.3).sort((x,y)=>y.score-x.score).slice(0,4);
+}
+
 // ============ NOTHING EVER HAPPENS INDEX ============
 // Volume-weighted probability of escalation across conflict markets (ceasefire/peace
 // markets are inverted). 0 = nothing ever happens, 100 = it's happening.
 const tensionOf=m=>/ceasefire|peace|deal|truce/i.test(m.question)?1-m.probability:m.probability;
 function nehIndex(ms){
-  const c=ms.filter(m=>m.category==='Conflict'||CONFLICT_RE.test(m.question));
+  const c=ms.filter(m=>isUSD(m)&&(m.category==='Conflict'||CONFLICT_RE.test(m.question)));
   if(!c.length)return{score:0,drivers:[],n:0};
   let w=0,s=0;c.forEach(m=>{const wt=Math.sqrt(Math.max(m.volume,1e4));w+=wt;s+=wt*tensionOf(m)});
   const drivers=[...c].sort((a,b)=>tensionOf(b)*Math.sqrt(b.volume)-tensionOf(a)*Math.sqrt(a.volume)).slice(0,4);
@@ -518,8 +596,8 @@ function genArcs(ms,flows){
   genArcsDC(ms.filter(m=>m.country!=='USA'&&!(m.links||[]).some(l=>l.country==='USA'))).forEach(a=>out.push(a));
   return out.concat(flows||[]);
 }
-function genArcsDC(ms){return ms.filter(m=>m.volume>1e6&&m.lat).slice(0,6).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.4,dashLength:0.3,dashGap:0.3,dashAnimateTime:2500+i*200,altitude:0.1+(i%3)*0.05}))}
-function genRings(ms,hl,dc){const rs=ms.filter(m=>m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:2,propagationSpeed:1.5,repeatPeriod:1200+i*200,color:tensionOf(m)>0.5&&m.category==='Conflict'?'rgba(239,68,68,0.5)':'rgba(59,130,246,0.4)'}));rs.push({lat:PENTAGON.lat,lng:PENTAGON.lng,maxR:2+(5-dc)*1.5,propagationSpeed:1+(5-dc)*0.8,repeatPeriod:Math.max(400,1600-(5-dc)*300),color:DOUGHCON[dc].color});if(hl)rs.unshift({lat:hl.lat,lng:hl.lng,maxR:5,propagationSpeed:3,repeatPeriod:800,color:'rgba(255,255,255,0.6)'});return rs}
+function genArcsDC(ms){return ms.filter(m=>isUSD(m)&&m.volume>1e6&&m.lat).slice(0,6).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.4,dashLength:0.3,dashGap:0.3,dashAnimateTime:2500+i*200,altitude:0.1+(i%3)*0.05}))}
+function genRings(ms,hl,dc){const rs=ms.filter(m=>isUSD(m)&&m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:2,propagationSpeed:1.5,repeatPeriod:1200+i*200,color:tensionOf(m)>0.5&&m.category==='Conflict'?'rgba(239,68,68,0.5)':'rgba(59,130,246,0.4)'}));rs.push({lat:PENTAGON.lat,lng:PENTAGON.lng,maxR:2+(5-dc)*1.5,propagationSpeed:1+(5-dc)*0.8,repeatPeriod:Math.max(400,1600-(5-dc)*300),color:DOUGHCON[dc].color});if(hl)rs.unshift({lat:hl.lat,lng:hl.lng,maxR:5,propagationSpeed:3,repeatPeriod:800,color:'rgba(255,255,255,0.6)'});return rs}
 function genActs(ms){const a=[];const amts=[500,1000,2500,5000,10000,25000];for(let i=0;i<14;i++){const m=ms[Math.floor(Math.random()*Math.min(ms.length,15))];if(!m)continue;const amt=amts[Math.floor(Math.random()*amts.length)];a.push({id:'a-'+i,market:m.question,action:Math.random()<0.5?'BUY':'SELL',amount:amt,isWhale:amt>=10000,time:new Date(Date.now()-Math.random()*300000),source:m.source})}return a.sort((x,y)=>y.time-x.time)}
 
 // ============ COMPONENTS ============
@@ -687,6 +765,8 @@ const[tradesLive,setTradesLive]=useState(null);
 const[whaleOnly,setWhaleOnly]=useState(false);
 const[pulses,setPulses]=useState([]);
 const[history,setHistory]=useState(null);
+const[venues,setVenues]=useState({});
+const[srcFilter,setSrcFilter]=useState('all');
 const marketsRef=useRef(markets);marketsRef.current=markets;
 
 useEffect(()=>{
@@ -708,7 +788,19 @@ return()=>clearInterval(i);
 },[]);
 
 useEffect(()=>{
-const loadPoly=async()=>{try{const p=await fetchPoly();if(p.length>5){setMarkets(p);setActivities(genActs(p));setDataSource('live');setLastUpd(new Date());setSelected(s=>s&&(p.find(m=>m.id===s.id)||s))}}catch(x){console.log('Polymarket error:',x.message)}};
+const FETCHERS={polymarket:fetchPoly,kalshi:fetchKalshi,manifold:fetchManifold,predictit:fetchPredictIt};
+const loadPoly=async()=>{
+const keys=Object.keys(FETCHERS);
+const res=await Promise.allSettled(keys.map(k=>FETCHERS[k]()));
+const st={},all=[];
+res.forEach((r,i)=>{const k=keys[i];if(r.status==='fulfilled'&&r.value.length){st[k]=r.value.length;all.push(...r.value)}else{st[k]=0;console.log(srcName(k)+' unavailable:',r.reason?.message||'no geo markets')}});
+setVenues(st);
+if(all.length>5){
+// keep live Polymarket prices from the stream when a refresh lands
+setMarkets(prev=>{const old=new Map(prev.map(m=>[m.id,m]));return all.map(m=>{const o=old.get(m.id);return o&&o.flashAt?{...m,probability:o.probability,flash:o.flash,flashAt:o.flashAt}:m})});
+setActivities(genActs(all));setDataSource('live');setLastUpd(new Date());setSelected(s=>s&&(all.find(m=>m.id===s.id)||s));
+}
+};
 loadPoly();const i=setInterval(loadPoly,300000);
 fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson').then(r=>r.json()).then(d=>setCountries(d)).catch(()=>{});
 return()=>clearInterval(i);
@@ -747,7 +839,7 @@ setMarkets(ms=>ms.map(apply));setSelected(s=>s&&apply(s));
 // Price history for the selected market
 useEffect(()=>{setHistory(null);if(!selected?.tokenYes)return;let off=false;fetchHistory(selected.tokenYes).then(h=>{if(!off)setHistory(h)}).catch(()=>{if(!off)setHistory([])});return()=>{off=true}},[selected?.tokenYes]);
 
-useEffect(()=>{if(markets.length===0)return;const i=setInterval(()=>{const c=markets.filter(m=>m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);setTimeout(()=>setHighlighted(null),4000)}},9000);return()=>clearInterval(i)},[markets]);
+useEffect(()=>{if(markets.length===0)return;const i=setInterval(()=>{const c=markets.filter(m=>isUSD(m)&&m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);setTimeout(()=>setHighlighted(null),4000)}},9000);return()=>clearInterval(i)},[markets]);
 
 // Size the globe to its grid cell, not the window
 useEffect(()=>{const el=globeWrap.current;if(!el)return;const ro=new ResizeObserver(([e])=>setGsize({w:Math.round(e.contentRect.width),h:Math.round(e.contentRect.height)}));ro.observe(el);return()=>ro.disconnect()},[]);
@@ -756,8 +848,8 @@ useEffect(()=>{if(!globeEl.current)return;const c=globeEl.current.controls();c.a
 
 useEffect(()=>{if(!globeEl.current)return;if(selected){globeEl.current.controls().autoRotate=false;globeEl.current.pointOfView({lat:selected.lat,lng:selected.lng,altitude:1.5},800)}else if(highlighted){globeEl.current.pointOfView({lat:highlighted.lat,lng:highlighted.lng,altitude:2},1500)}},[selected,highlighted]);
 
-const filtered=useMemo(()=>markets.filter(m=>{if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,catFilter]);
-const stats=useMemo(()=>({total:markets.length,volume:markets.reduce((s,m)=>s+m.volume,0)}),[markets]);
+const filtered=useMemo(()=>markets.filter(m=>{if(srcFilter!=='all'&&m.source!==srcFilter)return false;if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,catFilter,srcFilter]);
+const stats=useMemo(()=>({total:markets.length,volume:markets.filter(isUSD).reduce((s,m)=>s+m.volume,0)}),[markets]);
 const neh=useMemo(()=>nehIndex(markets),[markets]);
 const nehPrev=useMemo(()=>nehIndex(markets.map(m=>({...m,probability:Math.min(1,Math.max(0,m.probability-(m.change24||0)))}))).score,[markets]);
 const movers=useMemo(()=>[...markets].filter(m=>m.change24).sort((a,b)=>Math.abs(b.change24)-Math.abs(a.change24)).slice(0,5),[markets]);
@@ -770,6 +862,8 @@ const rings=useMemo(()=>[...genRings(filtered,highlighted,dc),...pulses.map(p=>(
 const shopPoints=useMemo(()=>(pizza?.shops||[]).map(s=>({...s,isShop:true})),[pizza]);
 const ticker=useMemo(()=>{const head=[`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`,`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`,...movers.slice(0,3).map(m=>`${m.change24>0?'📈':'📉'} ${m.question} ${fmtProb(m.probability)} (${fmtChg(m.change24)} 24h)`),...whales.slice(0,2).map(t=>`🐋 ${fmtVol(t.usd)} ${t.side} ${t.outcome} — ${t.title}`)];if(news.length===0)return[...head,'Loading live news...',...head,'Loading live news...'];const t=[...head,...news.slice(0,15).map(n=>(n.isBreaking?'🔴 ':'')+n.source+': '+n.title)];return[...t,...t]},[news,dc,neh.score,movers,whales]);
 const cats=['All','Conflict','Trump','Politics','Economy','Trade'];
+const srcCounts=useMemo(()=>{const c={};markets.forEach(m=>c[m.source]=(c[m.source]||0)+1);return c},[markets]);
+const similar=useMemo(()=>selected?similarMarkets(selected,markets):[],[selected,markets]);
 
 return(
 <div className="app">
@@ -792,7 +886,7 @@ return(
 </aside></Boundary>
 
 <main className="globe" ref={globeWrap}>
-<div className={`badge-api ${dataSource==='live'?'':'sample'}`}><span className="dot" style={{width:6,height:6,background:dataSource==='live'?'var(--green)':'var(--yellow)'}}></span>{dataSource==='live'?'Live Polymarket':'Sample markets'} · {fmtTime(lastUpd)}{wsStatus==='live'?' · streaming':''}</div>
+<div className={`badge-api ${dataSource==='live'?'':'sample'}`}><span className="dot" style={{width:6,height:6,background:dataSource==='live'?'var(--green)':'var(--yellow)'}}></span>{dataSource==='live'?'Live · '+Object.keys(venues).filter(k=>venues[k]).map(srcName).join(', '):'Sample markets'} · {fmtTime(lastUpd)}{wsStatus==='live'?' · streaming':''}</div>
 
 <div className="neh">
 <div className="dc-kicker">NOTHING EVER HAPPENS INDEX</div>
@@ -811,28 +905,30 @@ return(
 
 {selected&&(
 <div className="detail">
+<div className="src">{SOURCES[selected.source]?.icon} {srcName(selected.source)}{selected.source==='manifold'?' · play money':''}</div>
 <div className="detail-hd"><div className="detail-q">{selected.question}</div><button className="detail-close" onClick={()=>setSelected(null)}>✕</button></div>
 <div className="detail-stats">
 <div className="detail-stat"><div className="detail-val" style={{color:selected.probability>=0.6?'var(--green)':selected.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(selected.probability)}</div><div className="detail-lbl">Yes</div></div>
-<div className="detail-stat"><div className="detail-val">{fmtVol(selected.volume)}</div><div className="detail-lbl">Volume</div></div>
+{selected.volume>0&&<div className="detail-stat"><div className="detail-val">{fmtMoney(selected.volume,selected.source)}</div><div className="detail-lbl">Volume</div></div>}
 {selected.change24?<div className="detail-stat"><div className="detail-val mono" style={{color:selected.change24>0?'var(--green)':'var(--red)'}}>{fmtChg(selected.change24)}</div><div className="detail-lbl">24h pts</div></div>:null}
-{selected.vol24?<div className="detail-stat"><div className="detail-val">{fmtVol(selected.vol24)}</div><div className="detail-lbl">24h Vol</div></div>:null}
+{selected.vol24?<div className="detail-stat"><div className="detail-val">{fmtMoney(selected.vol24,selected.source)}</div><div className="detail-lbl">24h Vol</div></div>:null}
 <div className="detail-stat"><div className="detail-val">{selected.country}</div><div className="detail-lbl">Location</div></div>
 </div>
-{(selected.bid>0||selected.liquidity>0)&&<div className="shop-meta" style={{marginTop:8}}>{selected.bid>0&&<>Bid {fmtCents(selected.bid)} · Ask {fmtCents(selected.ask)} · </>}{selected.liquidity>0&&<>Liquidity {fmtVol(selected.liquidity)}</>}{selected.endDate&&<> · Ends {new Date(selected.endDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</>}</div>}
+{(selected.bid>0||selected.liquidity>0)&&<div className="shop-meta" style={{marginTop:8}}>{selected.bid>0&&<>Bid {fmtCents(selected.bid)} · Ask {fmtCents(selected.ask)} · </>}{selected.liquidity>0&&<>Liquidity {fmtMoney(selected.liquidity,selected.source)}</>}{selected.endDate&&<> · Ends {new Date(selected.endDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</>}</div>}
 {selected.links?.length>0&&<div className="shop-meta" style={{marginTop:4}}>Connects {selected.country} ↔ {selected.links.map(l=>l.country).join(', ')}</div>}
 {selected.tokenYes&&<PriceChart data={history&&(history.length?[...history,{t:Date.now(),p:selected.probability}]:history)}/>}
-{selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on Polymarket →</a>}
+{similar.length>0&&<div style={{marginTop:12,borderTop:'1px solid var(--border)',paddingTop:8}}><div className="dc-kicker" style={{marginBottom:4}}>SAME QUESTION ELSEWHERE</div>{similar.map(({m})=><div key={m.id} className="neh-drv" onClick={()=>setSelected(m)}><span>{SOURCES[m.source]?.icon} {srcName(m.source)} · {m.question}</span><span className="mono" style={{color:Math.abs(m.probability-selected.probability)>=0.05?'var(--yellow)':undefined}}>{fmtProb(m.probability)}{Math.abs(m.probability-selected.probability)>=0.01?' ('+(m.probability>selected.probability?'+':'−')+Math.round(Math.abs(m.probability-selected.probability)*100)+')':''}</span></div>)}</div>}
+{selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on {srcName(selected.source)} →</a>}
 </div>)}
 
 <Boundary name="Globe">{gsize.w>0&&!HAS_WEBGL&&<><FlatMap w={gsize.w} h={gsize.h} countries={countries.features} points={[...filtered,...shopPoints]} arcs={arcs} selected={selected} onSelect={setSelected} dcColor={DOUGHCON[dc].color}/><div className="note" style={{position:'absolute',left:12,bottom:4,right:12,zIndex:40,color:'#94a3b8'}}>2D view: your browser has WebGL turned off, so the 3D globe can't run. In Brave, enable <b>Settings → System → Use graphics acceleration when available</b> and restart the browser.</div></>}
 {gsize.w>0&&HAS_WEBGL&&<Globe ref={globeEl} width={gsize.w} height={gsize.h} globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg" bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="https://unpkg.com/three-globe/example/img/night-sky.png"
 polygonsData={countries.features||[]} polygonCapColor={()=>'rgba(0,0,0,0)'} polygonSideColor={()=>'rgba(100,150,200,0.05)'} polygonStrokeColor={()=>'rgba(100,180,255,0.25)'} polygonAltitude={0.005}
 pointsData={[...filtered,...shopPoints]} pointLat="lat" pointLng="lng"
-pointAltitude={d=>d.isShop?0.01+(d.ratio||0)*0.02:Math.min(0.05+d.volume/50000000,0.18)}
+pointAltitude={d=>d.isShop?0.01+(d.ratio||0)*0.02:Math.min(0.05+(isUSD(d)?d.volume:d.volume/100)/50000000,0.18)}
 pointRadius={d=>d.isShop?0.12:(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35}
 pointColor={d=>d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'}
-pointLabel={d=>d.isShop?'<div style="background:rgba(10,15,26,0.95);padding:8px 10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3)"><div style="font-weight:700;color:white;font-size:11px">🍕 '+d.name+'</div><div style="color:#94a3b8;font-size:10px">'+SHOP_STATUS(d.ratio).t+(d.ratio!=null?' · '+Math.round(d.ratio*100)+'% of usual':'')+'</div></div>':'<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">'+d.source.toUpperCase()+' • '+d.country+'</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">'+d.question+'</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">'+fmtProb(d.probability)+'</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">'+fmtVol(d.volume)+'</div></div></div></div>'}
+pointLabel={d=>d.isShop?'<div style="background:rgba(10,15,26,0.95);padding:8px 10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3)"><div style="font-weight:700;color:white;font-size:11px">🍕 '+d.name+'</div><div style="color:#94a3b8;font-size:10px">'+SHOP_STATUS(d.ratio).t+(d.ratio!=null?' · '+Math.round(d.ratio*100)+'% of usual':'')+'</div></div>':'<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">'+srcName(d.source).toUpperCase()+' • '+d.country+'</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">'+d.question+'</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">'+fmtProb(d.probability)+'</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">'+(d.volume>0?fmtMoney(d.volume,d.source):'—')+'</div></div></div></div>'}
 onPointClick={d=>{if(!d.isShop)setSelected(d)}}
 labelsData={[{lat:PENTAGON.lat,lng:PENTAGON.lng,text:'PENTAGON'}]} labelLat="lat" labelLng="lng" labelText="text" labelSize={0.6} labelDotRadius={0.25} labelColor={()=>DOUGHCON[dc].color} labelResolution={2}
 arcsData={arcs} arcStartLat="startLat" arcStartLng="startLng" arcEndLat="endLat" arcEndLng="endLng" arcColor="color" arcAltitude="altitude" arcStroke="stroke" arcDashLength="dashLength" arcDashGap="dashGap" arcDashAnimateTime="dashAnimateTime"
@@ -860,12 +956,13 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
 </a>)})}
 </>)}
 {tab==='markets'&&(<>
+<div className="tabs"><button className={`tab ${srcFilter==='all'?'active':''}`} onClick={()=>setSrcFilter('all')}>All {markets.length}</button>{Object.keys(SOURCES).filter(k=>srcCounts[k]).map(k=><button key={k} className={`tab ${srcFilter===k?'active':''}`} onClick={()=>setSrcFilter(k)}>{srcName(k)} {srcCounts[k]}</button>)}</div>
 <div className="tabs">{cats.map(c=><button key={c} className={`tab ${catFilter===c?'active':''}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
 {filtered.slice(0,40).map(m=>(
 <div key={m.id} className={`card ${selected?.id===m.id?'sel':''}`} onClick={()=>setSelected(m)}>
-<div className="src">{m.source==='polymarket'?'◆ Polymarket':'◇ Manifold'} · {m.category}</div>
+<div className="src">{SOURCES[m.source]?.icon} {srcName(m.source)} · {m.category}</div>
 <div className="q">{m.question}</div>
-<div className="row"><span><span key={m.flashAt||0} className={`prob ${m.probability>=0.7?'hi':m.probability>=0.4?'md':'lo'} ${m.flash&&Date.now()-m.flashAt<3000?'flash-'+m.flash:''}`}>{fmtProb(m.probability)}</span>{m.change24?<span className="mono" style={{fontSize:10,marginLeft:6,color:m.change24>0?'var(--green)':'var(--red)'}}>{fmtChg(m.change24)}</span>:null}</span><span className="vol">{m.vol24?fmtVol(m.vol24)+' 24h · ':''}{fmtVol(m.volume)}</span></div>
+<div className="row"><span><span key={m.flashAt||0} className={`prob ${m.probability>=0.7?'hi':m.probability>=0.4?'md':'lo'} ${m.flash&&Date.now()-m.flashAt<3000?'flash-'+m.flash:''}`}>{fmtProb(m.probability)}</span>{m.change24?<span className="mono" style={{fontSize:10,marginLeft:6,color:m.change24>0?'var(--green)':'var(--red)'}}>{fmtChg(m.change24)}</span>:null}</span><span className="vol">{m.vol24?fmtMoney(m.vol24,m.source)+' 24h · ':''}{m.volume>0?fmtMoney(m.volume,m.source):''}</span></div>
 </div>))}
 </>)}
 {tab==='activity'&&(tradesLive?(<>
