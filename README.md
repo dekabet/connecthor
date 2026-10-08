@@ -1,17 +1,27 @@
-# 🌐 Polyglobe
+# ⚡ ConnecTHOR
 
-Real-Time Geopolitical Market Intelligence - A 3D globe visualization of Polymarket prediction markets.
-
-![Polyglobe Preview](https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800)
+Pentagon Pizza Index + geopolitical prediction-market intel on a 3D globe, in a single static `index.html`. Inspired by [PizzINT](https://www.pizzint.watch/).
 
 ## Features
 
-- **Interactive 3D Globe** - Rotate, zoom, and explore markets worldwide
-- **Live Market Data** - Prediction market odds from Polymarket
-- **OSINT Layer** - Breaking news and intelligence markers
-- **Color-coded Probabilities** - Green (high), Yellow (uncertain), Red (low)
-- **Volume Indicators** - Marker height based on trading volume
-- **Direct Trading Links** - Click through to trade on Polymarket
+- **🍕 Pentagon Pizza Watch** - "Popular Times"-style busyness charts for pizza shops near the Pentagon, each scored against its usual level for that hour (QUIET / NOMINAL / BUSY / SPIKE)
+- **DOUGHCON level** - a DEFCON-style 5→1 alert level driven by the combined pizza index, with a 24-hour history sparkline
+- **📉 Nothing Ever Happens Index** - 0-100 tension score from the volume-weighted odds of conflict/escalation markets (ceasefire markets inverted), with the top driving markets
+- **Interactive 3D Globe** - Polymarket markets, Pentagon beacon whose pulse speeds up with DOUGHCON, pizza shops, arcs to hotspots
+- **Intel Feed** - live world news (BBC, NYT, Al Jazeera, NPR, Guardian via RSS) tagged MILITARY / DIPLOMACY / ECONOMY, plus a breaking ticker
+- **Markets tab** - live Polymarket odds (falls back to sample markets if the API is unreachable)
+
+### About the pizza data
+
+Google Maps Popular Times has no public API and can't be read from a static page, so out of the box the pizza busyness is **modeled**: typical hourly curves per shop plus deterministic noise and occasional correlated surges (every viewer sees the same values at the same time). The panel is badged `MODELED` while this is the case.
+
+To use real data, run your own collector and set `PIZZA_DATA_URL` in `index.html` to a JSON endpoint returning:
+
+```json
+{"updated":"2026-10-08T20:00:00Z","shops":[{"id":"dominos-pc","live":72,"typical":[0,0,0,0,0,0,0,0,0,0,10,25,45,40,30,28,35,55,70,72,60,45,30,15]}]}
+```
+
+`id` must match an entry in `SHOPS`; `typical` is 24 hourly values (0-100, ET).
 
 ## 🚀 Deploy to GitHub Pages
 
@@ -91,7 +101,7 @@ Options:
 
 ### Add Your Own Markets
 
-Edit the `SAMPLE_MARKETS` array in `index.html`:
+Edit the `MARKETS` array in `index.html`:
 
 ```javascript
 const SAMPLE_MARKETS = [
@@ -109,7 +119,7 @@ const SAMPLE_MARKETS = [
 
 ### Add Location Keywords
 
-Expand the `LOCATIONS` object to map new keywords:
+Expand the `LOCS` object to map new keywords:
 
 ```javascript
 const LOCATIONS = {

@@ -3,57 +3,92 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ConnecTHOR v2.0</title>
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <title>ConnecTHOR — Pizza Index & Market Intel</title>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/react-globe.gl@2.27.2"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.25.6/babel.min.js"></script>
   <style>
-    :root{--bg:#0a0f1a;--card:rgba(15,23,42,0.9);--border:rgba(71,85,105,0.4);--text:#f1f5f9;--muted:#94a3b8;--blue:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#eab308}
+    :root{--bg:#0a0f1a;--card:rgba(15,23,42,0.92);--card2:rgba(15,23,42,0.85);--border:rgba(71,85,105,0.4);--text:#f1f5f9;--muted:#94a3b8;--faint:#64748b;--blue:#3b82f6;--green:#22c55e;--red:#ef4444;--yellow:#eab308;--orange:#f97316;--track:rgba(148,163,184,0.28)}
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Inter,-apple-system,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
+    body{font-family:Inter,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
     #root{height:100%}
-    .app{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:300px 1fr 300px;grid-template-areas:"h h h" "l g r" "t t t";height:100vh}
-    .header{grid-area:h;background:linear-gradient(to bottom,var(--bg),rgba(10,15,26,0.95));border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;z-index:100}
-    .logo{display:flex;align-items:center;gap:10px}
-    .logo-icon{font-size:28px}
-    .logo h1{font-size:20px;font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-    .stats{display:flex;gap:20px}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+    .app{display:grid;grid-template-rows:auto 1fr auto;grid-template-columns:340px 1fr 320px;grid-template-areas:"h h h" "l g r" "t t t";height:100vh}
+
+    /* header */
+    .header{grid-area:h;background:linear-gradient(to bottom,var(--bg),rgba(10,15,26,0.95));border-bottom:1px solid var(--border);padding:8px 16px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:100}
+    .logo{display:flex;align-items:center;gap:10px;min-width:0}
+    .logo-icon{font-size:26px}
+    .logo h1{font-size:19px;font-weight:800;background:linear-gradient(135deg,#3b82f6,#8b5cf6);-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1.1}
+    .logo-sub{font-size:10px;color:var(--muted);letter-spacing:0.04em;text-transform:uppercase}
+    .stats{display:flex;gap:18px;align-items:center}
     .stat{text-align:center}
-    .stat-val{font-size:18px;font-weight:700}
-    .stat-val.live{color:var(--green);display:flex;align-items:center;gap:6px}
-    .stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase}
-    .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite}
+    .stat-val{font-size:16px;font-weight:700;white-space:nowrap}
+    .stat-lbl{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em}
+    .dc-pill{display:flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;border:1px solid;font-weight:800;font-size:13px;letter-spacing:0.05em}
+    .dot{width:8px;height:8px;background:var(--green);border-radius:50%;animation:pulse 2s infinite;display:inline-block}
     .dot.red{background:var(--red)}
-    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
-    .left{grid-area:l;background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
-    .panel-hd{padding:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.45}}
+    .search{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:white;width:150px;font-size:13px}
+
+    /* panels */
+    .left,.right{background:var(--card);display:flex;flex-direction:column;overflow:hidden}
+    .left{grid-area:l;border-right:1px solid var(--border)}
+    .right{grid-area:r;border-left:1px solid var(--border)}
+    .panel-hd{padding:12px 14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px}
     .panel-title{font-size:13px;font-weight:700}
-    .badge{background:var(--blue);color:white;font-size:10px;padding:2px 8px;border-radius:10px}
-    .badge.live{background:var(--green)}
-    .tabs{display:flex;padding:8px;gap:4px;border-bottom:1px solid var(--border)}
-    .tab{flex:1;padding:6px;border-radius:6px;border:none;background:transparent;color:var(--muted);font-size:10px;font-weight:600;cursor:pointer}
-    .tab:hover{background:rgba(255,255,255,0.05);color:white}
-    .tab.active{background:var(--blue);color:white}
-    .list{flex:1;overflow-y:auto;padding:8px}
-    .card{background:rgba(15,23,42,0.85);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px;cursor:pointer;transition:all 0.2s}
-    .card:hover{border-color:var(--blue);transform:translateX(3px)}
-    .card.sel{border-color:var(--blue);background:rgba(59,130,246,0.1)}
-    .src{font-size:9px;font-weight:600;color:#818cf8;text-transform:uppercase;margin-bottom:4px}
-    .q{font-size:12px;font-weight:600;line-height:1.4;margin-bottom:8px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-    .row{display:flex;justify-content:space-between;align-items:center}
-    .prob{font-size:18px;font-weight:800}
-    .prob.hi{color:var(--green)}.prob.md{color:var(--yellow)}.prob.lo{color:var(--red)}
-    .vol{font-size:11px;color:var(--muted)}
-    .globe{grid-area:g;position:relative;background:radial-gradient(ellipse at center,#1a1f35,#0a0f1a);overflow:hidden}
-    .badge-api{position:absolute;top:10px;right:10px;z-index:50;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:10px;font-weight:600;background:var(--card);border:1px solid var(--green);color:var(--green)}
-    .spotlight{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(139,92,246,0.2));backdrop-filter:blur(12px);border:1px solid rgba(59,130,246,0.3);border-radius:50px;padding:10px 20px;cursor:pointer}
-    .spotlight:hover{border-color:var(--blue);box-shadow:0 0 20px rgba(59,130,246,0.3)}
-    .spot-dot{width:8px;height:8px;background:var(--blue);border-radius:50%;animation:pulse 1s infinite}
+    .badge{background:var(--blue);color:white;font-size:10px;padding:2px 8px;border-radius:10px;font-weight:600}
+    .badge.warn{background:rgba(234,179,8,0.15);color:var(--yellow);border:1px solid rgba(234,179,8,0.4)}
+    .scroll{flex:1;overflow-y:auto;padding:10px}
+    .muted{color:var(--muted)}
+
+    /* doughcon */
+    .dc-box{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:10px}
+    .dc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+    .dc-kicker{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:0.08em}
+    .dc-level{font-size:30px;font-weight:900;letter-spacing:0.02em;line-height:1.1}
+    .dc-name{font-size:12px;font-weight:600;margin-top:2px}
+    .dc-index{text-align:right}
+    .dc-index .v{font-size:22px;font-weight:800}
+    .dc-scale{display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin:8px 0 4px}
+    .dc-seg{height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:rgba(255,255,255,0.35);background:rgba(148,163,184,0.12);border:1px solid transparent;transition:all .3s}
+    .dc-seg.on{color:#0a0f1a}
+    .dc-legend{display:flex;justify-content:space-between;font-size:9px;color:var(--faint);text-transform:uppercase}
+    .spark-hd{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin:12px 0 4px}
+
+    /* shops */
+    .shop{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+    .shop-hd{display:flex;justify-content:space-between;gap:8px}
+    .shop-name{font-size:12px;font-weight:700}
+    .shop-meta{font-size:10px;color:var(--muted)}
+    .shop-pct{text-align:right}
+    .shop-pct .v{font-size:17px;font-weight:800}
+    .chip{display:inline-flex;align-items:center;gap:4px;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;letter-spacing:0.05em;border:1px solid}
+    .chart-readout{font-size:10px;color:var(--muted);height:14px;margin-top:2px}
+    .axis{display:flex;justify-content:space-between;font-size:9px;color:var(--faint);margin-top:1px}
+    .note{font-size:10px;color:var(--faint);line-height:1.5;padding:4px 2px 12px}
+
+    /* globe */
+    .globe{grid-area:g;position:relative;background:radial-gradient(ellipse at center,#1a1f35,#0a0f1a);overflow:hidden;min-height:0}
+    .badge-api{position:absolute;top:12px;right:12px;z-index:50;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:10px;font-weight:600;background:var(--card);border:1px solid var(--green);color:var(--green)}
+    .badge-api.sample{border-color:var(--yellow);color:var(--yellow)}
+    .neh{position:absolute;top:12px;left:12px;z-index:50;width:280px;background:var(--card);backdrop-filter:blur(10px);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+    .neh-row{display:flex;align-items:baseline;justify-content:space-between}
+    .neh-score{font-size:30px;font-weight:900}
+    .neh-label{font-size:12px;font-weight:700}
+    .meter{position:relative;height:8px;border-radius:4px;background:linear-gradient(90deg,#22c55e,#eab308 50%,#ef4444);margin:8px 0 4px}
+    .meter-mark{position:absolute;top:-4px;width:4px;height:16px;border-radius:2px;background:white;box-shadow:0 0 0 2px #0a0f1a;transform:translateX(-50%);transition:left .6s}
+    .neh-drivers{margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
+    .neh-drv{display:flex;justify-content:space-between;gap:8px;font-size:11px;padding:3px 0;cursor:pointer}
+    .neh-drv:hover{color:var(--blue)}
+    .neh-drv span:first-child{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .spotlight{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);z-index:50;display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,rgba(59,130,246,0.2),rgba(139,92,246,0.2));backdrop-filter:blur(12px);border:1px solid rgba(59,130,246,0.3);border-radius:50px;padding:10px 20px;cursor:pointer;max-width:90%}
+    .spot-dot{width:8px;height:8px;background:var(--blue);border-radius:50%;animation:pulse 1s infinite;flex-shrink:0}
     .spot-lbl{font-size:10px;font-weight:700;color:var(--blue)}
     .spot-txt{font-size:13px;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .spot-prob{font-size:16px;font-weight:800}
-    .detail{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:60;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 24px;min-width:380px}
+    .detail{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:60;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 24px;min-width:min(380px,92%)}
     .detail-hd{display:flex;justify-content:space-between;margin-bottom:12px}
     .detail-q{font-size:14px;font-weight:700;flex:1;margin-right:12px}
     .detail-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px}
@@ -62,43 +97,68 @@
     .detail-val{font-size:22px;font-weight:800}
     .detail-lbl{font-size:10px;color:var(--muted);text-transform:uppercase}
     .detail-link{display:inline-block;margin-top:12px;color:var(--blue);font-size:12px;text-decoration:none}
-    .right{grid-area:r;background:var(--card);border-left:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden}
+
+    /* right tabs */
     .act-tabs{display:flex;border-bottom:1px solid var(--border)}
-    .act-tab{flex:1;padding:12px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent}
+    .act-tab{flex:1;padding:12px 6px;border:none;background:transparent;color:var(--muted);font-size:11px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent}
     .act-tab:hover{color:white;background:rgba(255,255,255,0.03)}
     .act-tab.active{color:var(--blue);border-bottom-color:var(--blue)}
-    .feed{flex:1;overflow-y:auto;padding:8px}
-    .act{display:flex;align-items:center;gap:10px;padding:10px;border-radius:8px;margin-bottom:4px;background:rgba(15,23,42,0.85);border:1px solid var(--border)}
+    .tabs{display:flex;gap:4px;margin-bottom:8px;flex-wrap:wrap}
+    .tab{flex:1;padding:5px 6px;border-radius:6px;border:none;background:rgba(255,255,255,0.04);color:var(--muted);font-size:10px;font-weight:600;cursor:pointer}
+    .tab:hover{color:white}
+    .tab.active{background:var(--blue);color:white}
+    .card{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;transition:all 0.2s}
+    .card:hover{border-color:var(--blue)}
+    .card.sel{border-color:var(--blue);background:rgba(59,130,246,0.1)}
+    .src{font-size:9px;font-weight:600;color:#818cf8;text-transform:uppercase;margin-bottom:4px}
+    .q{font-size:12px;font-weight:600;line-height:1.4;margin-bottom:6px}
+    .row{display:flex;justify-content:space-between;align-items:center}
+    .prob{font-size:17px;font-weight:800}
+    .prob.hi{color:var(--green)}.prob.md{color:var(--yellow)}.prob.lo{color:var(--red)}
+    .vol{font-size:11px;color:var(--muted)}
+    .act{display:flex;align-items:center;gap:10px;padding:9px;border-radius:8px;margin-bottom:4px;background:var(--card2);border:1px solid var(--border)}
     .act.whale{border-color:var(--yellow);background:rgba(234,179,8,0.1)}
-    .act-icon{font-size:16px}
     .act-content{flex:1;min-width:0}
     .act-title{font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .act-meta{font-size:10px;color:var(--muted)}
-    .act-amt{font-size:12px;font-weight:700}
     .act-amt.buy{color:var(--green)}.act-amt.sell{color:var(--red)}
     .act-time{font-size:10px;color:var(--muted)}
-    .news{padding:10px;border-radius:8px;margin-bottom:6px;background:rgba(15,23,42,0.85);border:1px solid var(--border);cursor:pointer;text-decoration:none;display:block;color:inherit}
+    .news{padding:10px;border-radius:8px;margin-bottom:6px;background:var(--card2);border:1px solid var(--border);text-decoration:none;display:block;color:inherit}
     .news:hover{border-color:var(--blue)}
     .news.breaking{border-left:3px solid var(--red);background:rgba(239,68,68,0.05)}
     .news-src{font-size:9px;font-weight:600;color:var(--blue);text-transform:uppercase;margin-bottom:4px;display:flex;align-items:center;gap:6px}
     .news-title{font-size:12px;line-height:1.4}
     .news-time{font-size:10px;color:var(--muted);margin-top:4px}
+    .tag{font-size:8px;font-weight:800;padding:1px 5px;border-radius:3px;letter-spacing:0.05em}
+    .tag.MILITARY{background:rgba(239,68,68,0.15);color:#fca5a5}
+    .tag.DIPLOMACY{background:rgba(59,130,246,0.15);color:#93c5fd}
+    .tag.ECONOMY{background:rgba(34,197,94,0.15);color:#86efac}
+    .news-status{font-size:9px;padding:3px 7px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:4px;color:var(--green)}
+    .news-status.rss{background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.3);color:var(--yellow)}
+    .news-loading{text-align:center;padding:20px;color:var(--muted);font-size:11px}
+
+    /* ticker */
     .ticker{grid-area:t;background:linear-gradient(90deg,rgba(220,38,38,0.15),rgba(239,68,68,0.1));border-top:1px solid rgba(239,68,68,0.3);padding:8px 0;overflow:hidden;display:flex;align-items:center}
-    .ticker-lbl{background:var(--red);color:white;padding:4px 12px;font-size:10px;font-weight:700;margin-right:16px;flex-shrink:0;display:flex;align-items:center;gap:6px}
+    .ticker-lbl{position:relative;z-index:2;box-shadow:12px 0 12px rgba(10,15,26,0.9);background:var(--red);color:white;padding:4px 12px;font-size:10px;font-weight:700;margin-right:16px;flex-shrink:0;display:flex;align-items:center;gap:6px}
     .ticker-lbl .livedot{width:6px;height:6px;background:white;border-radius:50%;animation:pulse 1s infinite}
-    .ticker-scroll{display:flex;animation:scroll 80s linear infinite;white-space:nowrap}
+    .ticker-scroll{display:flex;animation:scroll 90s linear infinite;white-space:nowrap}
     .ticker-scroll:hover{animation-play-state:paused}
     @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-    .ticker-item{padding:0 40px;font-size:12px;cursor:pointer}
-    .ticker-item:hover{color:var(--blue)}
+    .ticker-item{padding:0 40px;font-size:12px}
     .ticker-item::after{content:'•';margin-left:40px;color:var(--red)}
     .loading{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg)}
-    .loading-icon{font-size:64px}
-    .news-loading{text-align:center;padding:20px;color:var(--muted);font-size:11px}
-    .news-status{font-size:9px;padding:4px 8px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.3);border-radius:4px;color:var(--green)}
-    .news-status.rss{background:rgba(234,179,8,0.1);border-color:rgba(234,179,8,0.3);color:var(--yellow)}
     ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-    @media(max-width:1000px){.app{grid-template-columns:1fr;grid-template-areas:"h" "g" "t"}.left,.right{display:none}}
+
+    @media(max-width:1100px){
+      body{overflow:auto;height:auto}
+      .app{height:auto;grid-template-columns:1fr;grid-template-rows:auto auto 70vh auto auto;grid-template-areas:"h" "l" "g" "r" "t"}
+      .left,.right{border:none;border-bottom:1px solid var(--border);max-height:none}
+      .scroll{overflow:visible}
+      .header{flex-wrap:wrap}
+      .stats{flex-wrap:wrap;gap:12px}
+      .neh{width:auto;right:12px;top:52px}
+      .ticker{position:sticky;bottom:0}
+    }
   </style>
 </head>
 <body>
@@ -211,191 +271,382 @@ async function fetchNews() {
   return rss;
 }
 
+// ============ PIZZA INDEX ============
+// Google Maps "Popular Times" has no public API and can't be read from a static page.
+// Until a backend feed exists, live busyness is MODELED: each shop gets a typical
+// weekday curve, and the live value is that curve plus deterministic noise and rare
+// correlated surges (same result for every viewer at the same moment).
+// To plug in real data, set PIZZA_DATA_URL to a JSON endpoint returning
+//   {"updated":"<ISO time>","shops":[{"id":"dominos-pc","live":72,"typical":[24 hourly values 0-100]}]}
+const PIZZA_DATA_URL = null;
+const PENTAGON = {lat:38.8719,lng:-77.0563};
+
+// open/close in ET hours (close may exceed 24 = after midnight); peaks are 0-100 busyness
+const SHOPS=[
+{id:'dominos-pc',name:"Domino's Pizza",area:'Pentagon City',dist:0.9,lat:38.8622,lng:-77.0593,open:10,close:25,lunch:55,dinner:80,late:45},
+{id:'district-pp',name:'District Pizza Palace',area:'Crystal City',dist:1.0,lat:38.8575,lng:-77.0505,open:11,close:27,lunch:40,dinner:65,late:70},
+{id:'papajohns-cc',name:"Papa John's",area:'Crystal City',dist:1.4,lat:38.8548,lng:-77.0497,open:10,close:25,lunch:45,dinner:75,late:40},
+{id:'extreme-pr',name:'Extreme Pizza',area:'Pentagon Row',dist:0.8,lat:38.8631,lng:-77.0611,open:11,close:22,lunch:70,dinner:60,late:10},
+{id:'wethepizza-pc',name:'We, The Pizza',area:'Pentagon City',dist:1.1,lat:38.8619,lng:-77.0577,open:11,close:23,lunch:60,dinner:70,late:20},
+{id:'pizzato-arl',name:'Pizzato Pizza',area:'Arlington',dist:1.6,lat:38.8794,lng:-77.0921,open:11,close:24,lunch:35,dinner:55,late:30},
+];
+
+const DOUGHCON=[
+null,
+{lvl:1,name:'Maximum readiness',color:'#f8fafc'},
+{lvl:2,name:'Next step to max readiness',color:'#ef4444'},
+{lvl:3,name:'Increased force readiness',color:'#eab308'},
+{lvl:4,name:'Increased intel watch',color:'#22c55e'},
+{lvl:5,name:'Normal readiness',color:'#3b82f6'},
+];
+const doughconFor=idx=>idx>=2.2?1:idx>=1.75?2:idx>=1.4?3:idx>=1.15?4:5;
+const SHOP_STATUS=r=>r==null?{t:'CLOSED',c:'#64748b'}:r<0.8?{t:'QUIET',c:'#3b82f6'}:r<1.2?{t:'NOMINAL',c:'#22c55e'}:r<1.6?{t:'BUSY',c:'#eab308'}:{t:'SPIKE',c:'#ef4444'};
+
+const hash=s=>{let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}h^=h>>>13;h=Math.imul(h,1274126177);return((h^(h>>>16))>>>0)/4294967296};
+const ET_FMT=new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'numeric',hourCycle:'h23',weekday:'short'});
+function etTime(t){const p=Object.fromEntries(ET_FMT.formatToParts(new Date(t)).map(x=>[x.type,x.value]));return{h:(+p.hour%24)+(+p.minute)/60,wd:p.weekday}}
+
+const isOpen=(s,h)=>{const hh=h<s.open?h+24:h;return hh>=s.open&&hh<s.close};
+const bump=(h,mu,sd)=>{let d=Math.abs(h-mu);d=Math.min(d,24-d);return Math.exp(-(d*d)/(2*sd*sd))};
+function typicalAt(s,h){if(!isOpen(s,h))return 0;return Math.min(100,8+s.lunch*bump(h,12.3,1.4)+s.dinner*bump(h,18.6,1.7)+s.late*bump(h,23,1.6))}
+
+// Surges hit all shops at once (that's the "signal"): rare big ones in 2-hour windows,
+// plus more frequent mild hourly bumps
+function surgeAt(t){
+  const w=Math.floor(t/7200000),hr=Math.floor(t/3600000);
+  const big=hash('surge'+w)<0.05?(0.6+1.4*hash('mag'+w))*Math.sin(Math.PI*(t%7200000)/7200000):0;
+  const mild=hash('mild'+hr)<0.14?0.12+0.3*hash('mmag'+hr):0;
+  return 1+Math.max(big,mild);
+}
+function liveAt(s,t){
+  const{h}=etTime(t);if(!isOpen(s,h))return null;
+  const bucket=Math.floor(t/600000);
+  const noise=0.82+0.36*hash(s.id+':'+bucket);
+  const surge=surgeAt(t);
+  return Math.min(100,typicalAt(s,h)*noise*surge+(surge-1)*18);
+}
+const ratioOf=(live,typ)=>live==null?null:(live+5)/(typ+5);
+function indexOf(ratios){const r=ratios.filter(x=>x!=null);if(!r.length)return 1;const mean=r.reduce((a,b)=>a+b,0)/r.length;return 0.6*mean+0.4*Math.max(...r)}
+
+function modelSnapshot(t){
+  const{h}=etTime(t);
+  const shops=SHOPS.map(s=>{const typ=typicalAt(s,h);const live=liveAt(s,t);return{...s,typical:typ,live,ratio:ratioOf(live,typ),curve:Array.from({length:24},(_,i)=>typicalAt(s,i))}});
+  return{shops,index:indexOf(shops.map(s=>s.ratio)),hour:h,source:'model',updated:new Date(t)};
+}
+function modelHistory(t){const out=[];for(let i=48;i>=0;i--){const tt=t-i*1800000;const{h}=etTime(tt);out.push({t:tt,index:indexOf(SHOPS.map(s=>ratioOf(liveAt(s,tt),typicalAt(s,h))))})}return out}
+
+async function fetchPizza(){
+  const now=Date.now();
+  if(PIZZA_DATA_URL){
+    try{
+      const r=await fetch(PIZZA_DATA_URL,{signal:AbortSignal.timeout(8000)});
+      const d=await r.json();const{h}=etTime(now);
+      const shops=SHOPS.map(s=>{const x=d.shops?.find(y=>y.id===s.id);const curve=x?.typical?.length===24?x.typical:Array.from({length:24},(_,i)=>typicalAt(s,i));const typ=curve[Math.floor(h)];const live=x?x.live:null;return{...s,typical:typ,live,ratio:ratioOf(live,typ),curve}});
+      return{snap:{shops,index:indexOf(shops.map(s=>s.ratio)),hour:h,source:'live',updated:new Date(d.updated||now)},history:null};
+    }catch(e){console.log('Pizza feed error, using model:',e.message)}
+  }
+  return{snap:modelSnapshot(now),history:modelHistory(now)};
+}
+
 // ============ MARKETS DATA ============
 const MARKETS=[
-{id:'1',question:'Will Trump win 2028 presidential election?',probability:0.42,volume:45000000,source:'polymarket',lat:38.9,lng:-77,country:'USA',category:'Trump'},
-{id:'2',question:'Will Trump fire Fed Chair Powell?',probability:0.28,volume:12000000,source:'polymarket',lat:38.89,lng:-77.04,country:'USA',category:'Trump'},
-{id:'3',question:'Will Ukraine retake Crimea by 2027?',probability:0.15,volume:8500000,source:'polymarket',lat:48.38,lng:31.17,country:'Ukraine',category:'Conflict'},
-{id:'4',question:'Will Russia-Ukraine ceasefire occur in 2026?',probability:0.35,volume:15000000,source:'polymarket',lat:50.45,lng:30.52,country:'Ukraine',category:'Conflict'},
-{id:'5',question:'Will China invade Taiwan by 2027?',probability:0.12,volume:22000000,source:'polymarket',lat:25.03,lng:121.57,country:'Taiwan',category:'Conflict'},
-{id:'6',question:'Will Iran develop nuclear weapon by 2027?',probability:0.25,volume:6000000,source:'polymarket',lat:35.69,lng:51.39,country:'Iran',category:'Conflict'},
-{id:'7',question:'Will US enter recession in 2026?',probability:0.32,volume:18000000,source:'polymarket',lat:40.71,lng:-74.01,country:'USA',category:'Economy'},
-{id:'8',question:'Will Bitcoin reach $150K in 2026?',probability:0.45,volume:35000000,source:'polymarket',lat:37.77,lng:-122.42,country:'USA',category:'Economy'},
-{id:'9',question:'Will Trump impose 50% tariffs on China?',probability:0.58,volume:9500000,source:'polymarket',lat:39.9,lng:116.4,country:'China',category:'Trade'},
-{id:'10',question:'Will EU retaliate with counter-tariffs?',probability:0.72,volume:4500000,source:'polymarket',lat:50.85,lng:4.35,country:'EU',category:'Trade'},
-{id:'11',question:'Will Netanyahu remain PM through 2026?',probability:0.68,volume:3200000,source:'polymarket',lat:31.77,lng:35.22,country:'Israel',category:'Politics'},
-{id:'12',question:'Will Macron resign before term ends?',probability:0.18,volume:2800000,source:'polymarket',lat:48.86,lng:2.35,country:'France',category:'Politics'},
-{id:'13',question:'Will UK rejoin EU single market?',probability:0.08,volume:1500000,source:'manifold',lat:51.51,lng:-0.13,country:'UK',category:'Politics'},
-{id:'14',question:'Will Putin remain President through 2027?',probability:0.88,volume:5500000,source:'polymarket',lat:55.76,lng:37.62,country:'Russia',category:'Politics'},
-{id:'15',question:'Will India-Pakistan conflict escalate?',probability:0.22,volume:2100000,source:'manifold',lat:28.61,lng:77.21,country:'India',category:'Conflict'},
-{id:'16',question:'Will Trump buy Greenland?',probability:0.05,volume:8000000,source:'polymarket',lat:71.71,lng:-42.6,country:'Greenland',category:'Trump'},
-{id:'17',question:'Will North Korea test ICBM in 2026?',probability:0.65,volume:3500000,source:'polymarket',lat:39.03,lng:125.75,country:'North Korea',category:'Conflict'},
-{id:'18',question:'Will Fed cut rates below 3%?',probability:0.28,volume:7500000,source:'polymarket',lat:38.89,lng:-77.04,country:'USA',category:'Economy'},
-{id:'19',question:'Will AI cause major job displacement?',probability:0.55,volume:4200000,source:'manifold',lat:37.39,lng:-122.08,country:'USA',category:'Economy'},
-{id:'20',question:'Will Trump pardon Jan 6 defendants?',probability:0.82,volume:6500000,source:'polymarket',lat:38.9,lng:-77.01,country:'USA',category:'Trump'},
+{id:'1',question:'Will Trump win the 2028 presidential election?',probability:0.42,volume:45000000,source:'polymarket',lat:38.9,lng:-77,country:'USA',category:'Trump'},
+{id:'2',question:'Will Trump fire Fed Chair Powell before May 2027?',probability:0.18,volume:12000000,source:'polymarket',lat:38.89,lng:-77.04,country:'USA',category:'Trump'},
+{id:'3',question:'Will Ukraine retake Crimea by 2028?',probability:0.08,volume:8500000,source:'polymarket',lat:45.3,lng:34.1,country:'Ukraine',category:'Conflict'},
+{id:'4',question:'Russia x Ukraine ceasefire by end of 2026?',probability:0.22,volume:15000000,source:'polymarket',lat:50.45,lng:30.52,country:'Ukraine',category:'Conflict'},
+{id:'5',question:'Will China invade Taiwan by 2027?',probability:0.09,volume:22000000,source:'polymarket',lat:25.03,lng:121.57,country:'Taiwan',category:'Conflict'},
+{id:'6',question:'US military strike on Iran in 2026?',probability:0.27,volume:6000000,source:'polymarket',lat:35.69,lng:51.39,country:'Iran',category:'Conflict'},
+{id:'7',question:'Will the US enter a recession in 2027?',probability:0.3,volume:18000000,source:'polymarket',lat:40.71,lng:-74.01,country:'USA',category:'Economy'},
+{id:'8',question:'Will Bitcoin reach $150K by end of 2026?',probability:0.21,volume:35000000,source:'polymarket',lat:37.77,lng:-122.42,country:'USA',category:'Economy'},
+{id:'9',question:'Will Trump impose 50% tariffs on China?',probability:0.35,volume:9500000,source:'polymarket',lat:39.9,lng:116.4,country:'China',category:'Trade'},
+{id:'10',question:'Will the EU retaliate with counter-tariffs?',probability:0.6,volume:4500000,source:'polymarket',lat:50.85,lng:4.35,country:'EU',category:'Trade'},
+{id:'11',question:'Will Netanyahu remain PM through 2026?',probability:0.71,volume:3200000,source:'polymarket',lat:31.77,lng:35.22,country:'Israel',category:'Politics'},
+{id:'12',question:'Israel military strike on Iran by end of 2026?',probability:0.24,volume:7200000,source:'polymarket',lat:32.08,lng:34.78,country:'Israel',category:'Conflict'},
+{id:'13',question:'Will Macron resign before his term ends?',probability:0.15,volume:2800000,source:'polymarket',lat:48.86,lng:2.35,country:'France',category:'Politics'},
+{id:'14',question:'Will Putin remain President through 2027?',probability:0.9,volume:5500000,source:'polymarket',lat:55.76,lng:37.62,country:'Russia',category:'Politics'},
+{id:'15',question:'India x Pakistan military clash by end of 2026?',probability:0.14,volume:2100000,source:'manifold',lat:28.61,lng:77.21,country:'India',category:'Conflict'},
+{id:'16',question:'Will the US acquire Greenland?',probability:0.04,volume:8000000,source:'polymarket',lat:64.18,lng:-51.72,country:'Greenland',category:'Trump'},
+{id:'17',question:'Will North Korea test an ICBM in 2026?',probability:0.55,volume:3500000,source:'polymarket',lat:39.03,lng:125.75,country:'North Korea',category:'Conflict'},
+{id:'18',question:'US military action against Venezuela in 2026?',probability:0.33,volume:6800000,source:'polymarket',lat:10.49,lng:-66.88,country:'Venezuela',category:'Conflict'},
+{id:'19',question:'Will the Fed cut rates below 3% in 2027?',probability:0.38,volume:7500000,source:'polymarket',lat:38.89,lng:-77.04,country:'USA',category:'Economy'},
+{id:'20',question:'NATO invokes Article 5 in 2026?',probability:0.03,volume:2600000,source:'polymarket',lat:50.88,lng:4.42,country:'NATO',category:'Conflict'},
 ];
 
 const PROXIES=['','https://corsproxy.io/?','https://api.allorigins.win/raw?url='];
-const LOCS={trump:{lat:38.9,lng:-77,c:'USA'},ukraine:{lat:48.38,lng:31.17,c:'Ukraine'},russia:{lat:55.76,lng:37.62,c:'Russia'},china:{lat:39.9,lng:116.4,c:'China'},taiwan:{lat:25.03,lng:121.57,c:'Taiwan'},iran:{lat:35.69,lng:51.39,c:'Iran'},israel:{lat:31.77,lng:35.22,c:'Israel'},bitcoin:{lat:37.77,lng:-122.42,c:'USA'},fed:{lat:38.89,lng:-77.04,c:'USA'}};
+const LOCS={trump:{lat:38.9,lng:-77,c:'USA'},'united states':{lat:38.9,lng:-77,c:'USA'},'u.s.':{lat:38.9,lng:-77,c:'USA'},fed:{lat:38.89,lng:-77.04,c:'USA'},ukraine:{lat:48.38,lng:31.17,c:'Ukraine'},crimea:{lat:45.3,lng:34.1,c:'Ukraine'},russia:{lat:55.76,lng:37.62,c:'Russia'},putin:{lat:55.76,lng:37.62,c:'Russia'},china:{lat:39.9,lng:116.4,c:'China'},xi:{lat:39.9,lng:116.4,c:'China'},taiwan:{lat:25.03,lng:121.57,c:'Taiwan'},iran:{lat:35.69,lng:51.39,c:'Iran'},israel:{lat:31.77,lng:35.22,c:'Israel'},gaza:{lat:31.5,lng:34.47,c:'Gaza'},hamas:{lat:31.5,lng:34.47,c:'Gaza'},lebanon:{lat:33.89,lng:35.5,c:'Lebanon'},syria:{lat:33.51,lng:36.29,c:'Syria'},yemen:{lat:15.37,lng:44.19,c:'Yemen'},venezuela:{lat:10.49,lng:-66.88,c:'Venezuela'},maduro:{lat:10.49,lng:-66.88,c:'Venezuela'},'north korea':{lat:39.03,lng:125.75,c:'North Korea'},'south korea':{lat:37.57,lng:126.98,c:'South Korea'},india:{lat:28.61,lng:77.21,c:'India'},pakistan:{lat:33.68,lng:73.05,c:'Pakistan'},greenland:{lat:64.18,lng:-51.72,c:'Greenland'},nato:{lat:50.88,lng:4.42,c:'NATO'},' eu ':{lat:50.85,lng:4.35,c:'EU'},france:{lat:48.86,lng:2.35,c:'France'},macron:{lat:48.86,lng:2.35,c:'France'},germany:{lat:52.52,lng:13.4,c:'Germany'},' uk ':{lat:51.51,lng:-0.13,c:'UK'},japan:{lat:35.68,lng:139.69,c:'Japan'},mexico:{lat:19.43,lng:-99.13,c:'Mexico'},canada:{lat:45.42,lng:-75.7,c:'Canada'},bitcoin:{lat:37.77,lng:-122.42,c:'USA'}};
 
-function getLoc(q){const l=q.toLowerCase();for(const[k,v]of Object.entries(LOCS)){if(l.includes(k))return{lat:v.lat+(Math.random()-0.5)*2,lng:v.lng+(Math.random()-0.5)*2,country:v.c}}return null}
-function getCat(q){const l=q.toLowerCase();if(l.includes('trump'))return'Trump';if(l.includes('war')||l.includes('military'))return'Conflict';if(l.includes('bitcoin')||l.includes('economy'))return'Economy';if(l.includes('tariff'))return'Trade';return'Politics'}
+const CONFLICT_RE=/\b(war|invade|invasion|strike|attack|nuclear|military|ceasefire|missile|clash|troops|icbm|article 5|bomb)/i;
+function getLoc(q){const l=' '+q.toLowerCase()+' ';for(const[k,v]of Object.entries(LOCS)){if(l.includes(k))return{lat:v.lat+(Math.random()-0.5)*1.5,lng:v.lng+(Math.random()-0.5)*1.5,country:v.c}}return null}
+function getCat(q){const l=q.toLowerCase();if(CONFLICT_RE.test(l))return'Conflict';if(l.includes('trump'))return'Trump';if(l.includes('bitcoin')||l.includes('recession')||l.includes('fed ')||l.includes('rate'))return'Economy';if(l.includes('tariff'))return'Trade';return'Politics'}
 const fmtProb=p=>Math.round(p*100)+'%';
-const fmtVol=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':v>=1e3?'$'+(v/1e3).toFixed(0)+'K':'$'+v;
+const fmtVol=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':v>=1e3?'$'+(v/1e3).toFixed(0)+'K':'$'+Math.round(v);
 const fmtTime=d=>{const t=new Date(d).getTime();if(isNaN(t))return'';const m=Math.floor((Date.now()-t)/60000);if(m<1)return'Just now';if(m<60)return m+'m ago';return Math.floor(m/60)+'h ago'};
+const fmtHour=h=>{const x=Math.floor(h)%24;return(x%12||12)+(x<12?'a':'p')};
 
-async function fetchPoly(){for(const p of PROXIES){try{const url=p?p+encodeURIComponent('https://gamma-api.polymarket.com/events?closed=false&active=true&limit=50'):'https://gamma-api.polymarket.com/events?closed=false&active=true&limit=50';const r=await fetch(url,{signal:AbortSignal.timeout(8000)});if(!r.ok)continue;const d=await r.json();if(!Array.isArray(d))continue;const ms=[];for(const e of d){if(!e.markets?.length)continue;const m=e.markets[0];const loc=getLoc(e.title||m.question||'');if(!loc)continue;let prob=0.5;try{const pr=typeof m.outcomePrices==='string'?m.outcomePrices.split(','):m.outcomePrices;prob=parseFloat(pr[0])||0.5}catch(x){}ms.push({id:m.id||e.id,question:e.title||m.question,probability:prob,volume:parseFloat(m.volume||0),source:'polymarket',slug:e.slug,url:'https://polymarket.com/event/'+e.slug,...loc,category:getCat(e.title||m.question||'')});}if(ms.length>0)return ms}catch(x){}}return[]}
+async function fetchPoly(){const base='https://gamma-api.polymarket.com/events?closed=false&active=true&limit=100&order=volume&ascending=false';for(const p of PROXIES){try{const url=p?p+encodeURIComponent(base):base;const r=await fetch(url,{signal:AbortSignal.timeout(8000)});if(!r.ok)continue;const d=await r.json();if(!Array.isArray(d))continue;const ms=[];for(const e of d){if(!e.markets?.length)continue;const m=e.markets[0];const q=e.title||m.question||'';const loc=getLoc(q);if(!loc)continue;let prob=0.5;try{const pr=typeof m.outcomePrices==='string'?JSON.parse(m.outcomePrices):m.outcomePrices;prob=parseFloat(pr[0])||0.5}catch(x){}ms.push({id:m.id||e.id,question:q,probability:prob,volume:parseFloat(e.volume||m.volume||0),source:'polymarket',slug:e.slug,url:'https://polymarket.com/event/'+e.slug,...loc,category:getCat(q)});}if(ms.length>0)return ms}catch(x){}}return[]}
 
-function genArcs(ms){return ms.filter(m=>m.volume>1e6&&m.lat).slice(0,10).map((m,i)=>({startLat:38.9,startLng:-77,endLat:m.lat,endLng:m.lng,color:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.2)']:m.category==='Conflict'?['rgba(249,115,22,0.7)','rgba(249,115,22,0.2)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.2)'],stroke:0.8,dashLength:0.4,dashGap:0.2,dashAnimateTime:1500+i*200,altitude:0.1+(i%3)*0.05}))}
-function genRings(ms,hl){const rs=ms.filter(m=>m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:m.category==='Trump'?3:2,propagationSpeed:1.5,repeatPeriod:1200+i*200,color:m.probability>0.6?'rgba(34,197,94,0.5)':m.probability<0.4?'rgba(239,68,68,0.5)':'rgba(245,158,11,0.5)'}));if(hl)rs.unshift({lat:hl.lat,lng:hl.lng,maxR:5,propagationSpeed:3,repeatPeriod:800,color:'rgba(255,255,255,0.6)'});return rs}
-function genActs(ms){const a=[];const acts=['BUY','SELL'];const amts=[500,1000,2500,5000,10000,25000];for(let i=0;i<12;i++){const m=ms[Math.floor(Math.random()*Math.min(ms.length,15))];if(!m)continue;const amt=amts[Math.floor(Math.random()*amts.length)];a.push({id:'a-'+i,market:m.question.substring(0,35)+'...',action:acts[Math.floor(Math.random()*2)],amount:amt,isWhale:amt>=10000,time:new Date(Date.now()-Math.random()*300000),source:m.source})}return a.sort((x,y)=>y.time-x.time)}
+// ============ NOTHING EVER HAPPENS INDEX ============
+// Volume-weighted probability of escalation across conflict markets (ceasefire/peace
+// markets are inverted). 0 = nothing ever happens, 100 = it's happening.
+const tensionOf=m=>/ceasefire|peace|deal|truce/i.test(m.question)?1-m.probability:m.probability;
+function nehIndex(ms){
+  const c=ms.filter(m=>m.category==='Conflict'||CONFLICT_RE.test(m.question));
+  if(!c.length)return{score:0,drivers:[],n:0};
+  let w=0,s=0;c.forEach(m=>{const wt=Math.sqrt(Math.max(m.volume,1e4));w+=wt;s+=wt*tensionOf(m)});
+  const drivers=[...c].sort((a,b)=>tensionOf(b)*Math.sqrt(b.volume)-tensionOf(a)*Math.sqrt(a.volume)).slice(0,4);
+  return{score:Math.round(100*s/w),drivers,n:c.length};
+}
+const nehLabel=s=>s<20?{t:'Nothing ever happens',c:'#22c55e'}:s<35?{t:'Simmering',c:'#84cc16'}:s<50?{t:'Elevated',c:'#eab308'}:s<70?{t:'Something is happening',c:'#f97316'}:{t:"It's happening",c:'#ef4444'};
+
+function newsTag(title){if(/military|troops|strike|missile|army|navy|air force|drone|attack|war\b|pentagon|defen[cs]e|bomb|killed|soldier/i.test(title))return'MILITARY';if(/talks|summit|ceasefire|sanction|treaty|minister|diplomat|\bun\b|nato|envoy|election/i.test(title))return'DIPLOMACY';if(/market|tariff|econom|inflation|stocks|oil|trade|bank/i.test(title))return'ECONOMY';return null}
+
+function genArcs(ms){return ms.filter(m=>m.volume>1e6&&m.lat).slice(0,10).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.7,dashLength:0.4,dashGap:0.2,dashAnimateTime:1500+i*200,altitude:0.1+(i%3)*0.05}))}
+function genRings(ms,hl,dc){const rs=ms.filter(m=>m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:2,propagationSpeed:1.5,repeatPeriod:1200+i*200,color:tensionOf(m)>0.5&&m.category==='Conflict'?'rgba(239,68,68,0.5)':'rgba(59,130,246,0.4)'}));rs.push({lat:PENTAGON.lat,lng:PENTAGON.lng,maxR:2+(5-dc)*1.5,propagationSpeed:1+(5-dc)*0.8,repeatPeriod:Math.max(400,1600-(5-dc)*300),color:DOUGHCON[dc].color});if(hl)rs.unshift({lat:hl.lat,lng:hl.lng,maxR:5,propagationSpeed:3,repeatPeriod:800,color:'rgba(255,255,255,0.6)'});return rs}
+function genActs(ms){const a=[];const amts=[500,1000,2500,5000,10000,25000];for(let i=0;i<14;i++){const m=ms[Math.floor(Math.random()*Math.min(ms.length,15))];if(!m)continue;const amt=amts[Math.floor(Math.random()*amts.length)];a.push({id:'a-'+i,market:m.question,action:Math.random()<0.5?'BUY':'SELL',amount:amt,isWhale:amt>=10000,time:new Date(Date.now()-Math.random()*300000),source:m.source})}return a.sort((x,y)=>y.time-x.time)}
+
+// ============ COMPONENTS ============
+function Clock(){
+  const[now,setNow]=useState(new Date());
+  useEffect(()=>{const i=setInterval(()=>setNow(new Date()),1000);return()=>clearInterval(i)},[]);
+  const f=tz=>now.toLocaleTimeString('en-GB',{timeZone:tz,hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  return<><div className="stat"><div className="stat-val mono">{f('America/New_York')}</div><div className="stat-lbl">Washington DC</div></div><div className="stat"><div className="stat-val mono">{f('UTC')}</div><div className="stat-lbl">Zulu</div></div></>;
+}
+
+// Popular-times style bars: typical busyness per hour, current hour shows live value
+const HOURS=Array.from({length:24},(_,i)=>(i+6)%24); // 6am → 5am
+function PopChart({shop,hour}){
+  const[hov,setHov]=useState(null);
+  const W=240,H=50,bw=8,gap=2,cur=Math.floor(hour);
+  const st=SHOP_STATUS(shop.ratio);
+  const y=v=>H-Math.max(v,0)/100*H;
+  const read=hov!=null?hov:cur;
+  const readTyp=Math.round(shop.curve[read]);
+  return(<div>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={`${shop.name} busyness by hour`} onMouseLeave={()=>setHov(null)} style={{display:'block'}}>
+      <line x1="0" x2={W} y1={H-0.5} y2={H-0.5} stroke="rgba(148,163,184,0.25)"/>
+      {HOURS.map((h,i)=>{const x=i*(bw+gap);const typ=shop.curve[h];const isCur=h===cur;return(<g key={h}>
+        {typ>0&&<path d={`M${x},${H} V${y(typ)+2} q0,-2 2,-2 h${bw-4} q2,0 2,2 V${H} Z`} fill={isCur?'rgba(148,163,184,0.18)':hov===h?'rgba(148,163,184,0.55)':'var(--track)'} stroke={isCur?'rgba(226,232,240,0.7)':'none'} strokeDasharray={isCur?'2 2':undefined}/>}
+        {isCur&&shop.live!=null&&<path d={`M${x+1},${H} V${y(shop.live)+2} q0,-2 2,-2 h${bw-6} q2,0 2,2 V${H} Z`} fill={st.c}/>}
+        <rect x={x-1} y="0" width={bw+gap} height={H} fill="transparent" onMouseEnter={()=>setHov(h)}/>
+      </g>)})}
+    </svg>
+    <div className="axis"><span>6a</span><span>12p</span><span>6p</span><span>12a</span><span>5a</span></div>
+    <div className="chart-readout">{fmtHour(read)}: usually {readTyp?readTyp+'% busy':'closed'}{read===cur&&shop.live!=null?` · now ${Math.round(shop.live)}%`:''}</div>
+  </div>);
+}
+
+function Sparkline({data}){
+  const[hov,setHov]=useState(null);
+  if(!data||data.length<2)return null;
+  const W=300,H=44,max=Math.max(2.4,...data.map(d=>d.index)),min=0.6;
+  const x=i=>i/(data.length-1)*W,y=v=>H-4-(v-min)/(max-min)*(H-8);
+  const pts=data.map((d,i)=>`${x(i).toFixed(1)},${y(d.index).toFixed(1)}`).join(' ');
+  const thresholds=[1.15,1.4,1.75,2.2].filter(t=>t<max);
+  const h=hov!=null?data[hov]:data[data.length-1];
+  return(<div>
+    <div className="spark-hd"><span>Index · last 24h</span><span className="mono">{new Date(h.t).toLocaleTimeString('en-US',{timeZone:'America/New_York',hour:'numeric',minute:'2-digit'})} ET · {h.index.toFixed(2)}× · DOUGHCON {doughconFor(h.index)}</span></div>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{display:'block'}} onMouseLeave={()=>setHov(null)}
+      onMouseMove={e=>{const r=e.currentTarget.getBoundingClientRect();setHov(Math.max(0,Math.min(data.length-1,Math.round((e.clientX-r.left)/r.width*(data.length-1)))))}}>
+      {thresholds.map(t=><line key={t} x1="0" x2={W} y1={y(t)} y2={y(t)} stroke="rgba(148,163,184,0.18)" strokeDasharray="3 3"/>)}
+      <polyline points={pts} fill="none" stroke="#93c5fd" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+      {hov!=null&&<line x1={x(hov)} x2={x(hov)} y1="0" y2={H} stroke="rgba(226,232,240,0.4)"/>}
+      <circle cx={x(hov??data.length-1)} cy={y(h.index)} r="4" fill="#93c5fd" stroke="#0f172a" strokeWidth="2"/>
+    </svg>
+  </div>);
+}
+
+function PizzaPanel({pizza,history}){
+  if(!pizza)return<div className="news-loading">Loading pizza intel…</div>;
+  const dc=doughconFor(pizza.index);const D=DOUGHCON[dc];
+  const shops=[...pizza.shops].sort((a,b)=>(b.ratio??-1)-(a.ratio??-1));
+  return(<>
+    <div className="dc-box" style={{borderColor:D.color+'66'}}>
+      <div className="dc-top">
+        <div><div className="dc-kicker">DOUGHCON</div><div className="dc-level" style={{color:D.color}}>LEVEL {dc}</div><div className="dc-name">{D.name}</div></div>
+        <div className="dc-index"><div className="dc-kicker">PIZZA INDEX</div><div className="v mono">{pizza.index.toFixed(2)}×</div><div className="shop-meta">of usual activity</div></div>
+      </div>
+      <div className="dc-scale">{[5,4,3,2,1].map(l=><div key={l} className={`dc-seg ${l===dc?'on':''}`} style={l===dc?{background:DOUGHCON[l].color}:{}}>{l}</div>)}</div>
+      <div className="dc-legend"><span>Peacetime</span><span>Max readiness</span></div>
+      <Sparkline data={history}/>
+    </div>
+    {shops.map(s=>{const st=SHOP_STATUS(s.ratio);return(
+      <div key={s.id} className="shop">
+        <div className="shop-hd">
+          <div><div className="shop-name">{s.name}</div><div className="shop-meta">{s.area} · {s.dist} mi from Pentagon</div></div>
+          <div className="shop-pct"><span className="chip" style={{color:st.c,borderColor:st.c+'66'}}>● {st.t}</span>{s.ratio!=null&&<div className="v mono">{Math.round(s.ratio*100)}%</div>}</div>
+        </div>
+        <PopChart shop={s} hour={pizza.hour}/>
+      </div>)})}
+    <div className="note">{pizza.source==='model'?'⚠ Modeled data. Google Maps Popular Times has no public API, so live busyness is simulated from typical curves with occasional correlated surges. Set PIZZA_DATA_URL to connect a real feed.':'Live feed · updated '+fmtTime(pizza.updated)}<br/>The Pentagon Pizza Index is folklore-grade OSINT — for fun, not for decisions.</div>
+  </>);
+}
 
 function App(){
 const globeEl=useRef();
+const globeWrap=useRef();
+const[gsize,setGsize]=useState({w:0,h:0});
 const[markets,setMarkets]=useState(MARKETS);
 const[news,setNews]=useState([]);
 const[newsSource,setNewsSource]=useState('loading');
 const[newsLoading,setNewsLoading]=useState(true);
 const[activities,setActivities]=useState(()=>genActs(MARKETS));
-const[loading,setLoading]=useState(true);
 const[dataSource,setDataSource]=useState('sample');
 const[selected,setSelected]=useState(null);
 const[highlighted,setHighlighted]=useState(null);
 const[search,setSearch]=useState('');
-const[srcFilter,setSrcFilter]=useState('all');
 const[catFilter,setCatFilter]=useState('All');
 const[tab,setTab]=useState('news');
 const[countries,setCountries]=useState({features:[]});
 const[lastUpd,setLastUpd]=useState(new Date());
 const[newsLastUpd,setNewsLastUpd]=useState(null);
+const[pizza,setPizza]=useState(null);
+const[pizzaHist,setPizzaHist]=useState(null);
 
-// Fetch news on mount and every 2 minutes
+useEffect(()=>{
+const load=async()=>{const{snap,history}=await fetchPizza();setPizza(snap);if(history)setPizzaHist(history)};
+load();const i=setInterval(load,60000);return()=>clearInterval(i);
+},[]);
+
 useEffect(()=>{
 const loadNews=async()=>{
 try{
 const result=await fetchNews();
-if(result&&result.items.length>0){
-setNews(result.items);
-setNewsSource(result.source);
-setNewsLastUpd(new Date());
-}
+if(result&&result.items.length>0){setNews(result.items);setNewsSource(result.source);setNewsLastUpd(new Date())}
 }catch(e){console.log('News error:',e)}
 setNewsLoading(false);
 };
 loadNews();
-const i=setInterval(loadNews,120000); // Refresh every 2 min
+const i=setInterval(loadNews,120000);
 return()=>clearInterval(i);
 },[]);
 
 useEffect(()=>{
-setLoading(false);
-(async()=>{try{const p=await fetchPoly();if(p.length>5){setMarkets(p);setActivities(genActs(p));setDataSource('live');setLastUpd(new Date())}}catch(x){}})();
-setTimeout(()=>{fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson').then(r=>r.json()).then(d=>setCountries(d)).catch(()=>{})},2000);
+const loadPoly=async()=>{try{const p=await fetchPoly();if(p.length>5){setMarkets(p);setActivities(genActs(p));setDataSource('live');setLastUpd(new Date())}}catch(x){}};
+loadPoly();const i=setInterval(loadPoly,300000);
+fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson').then(r=>r.json()).then(d=>setCountries(d)).catch(()=>{});
+return()=>clearInterval(i);
 },[]);
 
-useEffect(()=>{if(markets.length===0)return;const i=setInterval(()=>{const c=markets.filter(m=>m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);setTimeout(()=>setHighlighted(null),4000)}},8000);return()=>clearInterval(i)},[markets]);
+useEffect(()=>{if(markets.length===0)return;const i=setInterval(()=>{const c=markets.filter(m=>m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);setTimeout(()=>setHighlighted(null),4000)}},9000);return()=>clearInterval(i)},[markets]);
 
-useEffect(()=>{if(!globeEl.current||loading)return;globeEl.current.controls().autoRotate=true;globeEl.current.controls().autoRotateSpeed=0.3;globeEl.current.pointOfView({lat:25,lng:0,altitude:2.2},1500)},[loading]);
+// Size the globe to its grid cell, not the window
+useEffect(()=>{const el=globeWrap.current;if(!el)return;const ro=new ResizeObserver(([e])=>setGsize({w:Math.round(e.contentRect.width),h:Math.round(e.contentRect.height)}));ro.observe(el);return()=>ro.disconnect()},[]);
+
+useEffect(()=>{if(!globeEl.current)return;const c=globeEl.current.controls();c.autoRotate=true;c.autoRotateSpeed=0.3;globeEl.current.pointOfView({lat:30,lng:-40,altitude:2.2},1500)},[gsize.w>0]);
 
 useEffect(()=>{if(!globeEl.current)return;if(selected){globeEl.current.controls().autoRotate=false;globeEl.current.pointOfView({lat:selected.lat,lng:selected.lng,altitude:1.5},800)}else if(highlighted){globeEl.current.pointOfView({lat:highlighted.lat,lng:highlighted.lng,altitude:2},1500)}},[selected,highlighted]);
 
-const filtered=useMemo(()=>markets.filter(m=>{if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(srcFilter!=='all'&&m.source!==srcFilter)return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,srcFilter,catFilter]);
-const stats=useMemo(()=>({total:markets.length,volume:markets.reduce((s,m)=>s+m.volume,0),poly:markets.filter(m=>m.source==='polymarket').length,mf:markets.filter(m=>m.source==='manifold').length}),[markets]);
+const filtered=useMemo(()=>markets.filter(m=>{if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,catFilter]);
+const stats=useMemo(()=>({total:markets.length,volume:markets.reduce((s,m)=>s+m.volume,0)}),[markets]);
+const neh=useMemo(()=>nehIndex(markets),[markets]);
+const nl=nehLabel(neh.score);
+const dc=pizza?doughconFor(pizza.index):5;
 const arcs=useMemo(()=>genArcs(filtered),[filtered]);
-const rings=useMemo(()=>genRings(filtered,highlighted),[filtered,highlighted]);
-const ticker=useMemo(()=>{if(news.length===0)return['Loading live news...','Connecting to news sources...'];const t=news.slice(0,15).map(n=>(n.isBreaking?'🔴 ':'')+n.source+': '+n.title);return[...t,...t]},[news]);
-const cats=['All','Trump','Politics','Conflict','Economy','Trade'];
-
-if(loading)return<div className="loading"><div className="loading-icon">⚡</div><h2 style={{marginTop:16,fontSize:24,fontWeight:800}}>ConnecTHOR v2.0</h2></div>;
+const rings=useMemo(()=>genRings(filtered,highlighted,dc),[filtered,highlighted,dc]);
+const shopPoints=useMemo(()=>(pizza?.shops||[]).map(s=>({...s,isShop:true})),[pizza]);
+const ticker=useMemo(()=>{const head=[`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`,`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`];if(news.length===0)return[...head,'Loading live news...',...head,'Loading live news...'];const t=[...head,...news.slice(0,15).map(n=>(n.isBreaking?'🔴 ':'')+n.source+': '+n.title)];return[...t,...t]},[news,dc,neh.score]);
+const cats=['All','Conflict','Trump','Politics','Economy','Trade'];
 
 return(
 <div className="app">
 <header className="header">
-<div className="logo"><span className="logo-icon">⚡</span><h1>ConnecTHOR</h1></div>
+<div className="logo"><span className="logo-icon">⚡</span><div><h1>ConnecTHOR</h1><div className="logo-sub">Pentagon Pizza Index · Market Intel</div></div></div>
 <div className="stats">
+<div className="dc-pill" style={{color:DOUGHCON[dc].color,borderColor:DOUGHCON[dc].color+'88',background:DOUGHCON[dc].color+'14'}}>🍕 DOUGHCON {dc}</div>
+<div className="stat"><div className="stat-val mono" style={{color:nl.c}}>{neh.score}</div><div className="stat-lbl">NEH Index</div></div>
 <div className="stat"><div className="stat-val">{stats.total}</div><div className="stat-lbl">Markets</div></div>
 <div className="stat"><div className="stat-val">{fmtVol(stats.volume)}</div><div className="stat-lbl">Volume</div></div>
-<div className="stat"><div className="stat-val live"><span className="dot"></span>{dataSource==='live'?'LIVE':'SAMPLE'}</div><div className="stat-lbl">{fmtTime(lastUpd)}</div></div>
+<Clock/>
 </div>
-<input type="text" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)} style={{background:'rgba(15,23,42,0.9)',border:'1px solid rgba(71,85,105,0.4)',borderRadius:8,padding:'8px 12px',color:'white',width:160,fontSize:13}}/>
+<input className="search" type="text" placeholder="Search markets..." value={search} onChange={e=>setSearch(e.target.value)}/>
 </header>
 
 <aside className="left">
-<div className="panel-hd"><span className="panel-title">📊 Markets</span><span className="badge">{filtered.length}</span></div>
-<div className="tabs">
-<button className={`tab ${srcFilter==='all'?'active':''}`} onClick={()=>setSrcFilter('all')}>All</button>
-<button className={`tab ${srcFilter==='polymarket'?'active':''}`} onClick={()=>setSrcFilter('polymarket')}>Poly</button>
-<button className={`tab ${srcFilter==='manifold'?'active':''}`} onClick={()=>setSrcFilter('manifold')}>Manifold</button>
-</div>
-<div className="tabs">{cats.map(c=><button key={c} className={`tab ${catFilter===c?'active':''}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
-<div className="list">
-{filtered.slice(0,25).map(m=>(
-<div key={m.id} className={`card ${selected?.id===m.id?'sel':''}`} onClick={()=>setSelected(m)}>
-<div className="src">{m.source==='polymarket'?'◆ Polymarket':'◇ Manifold'}</div>
-<div className="q">{m.question}</div>
-<div className="row"><span className={`prob ${m.probability>=0.7?'hi':m.probability>=0.4?'md':'lo'}`}>{fmtProb(m.probability)}</span><span className="vol">{fmtVol(m.volume)}</span></div>
-</div>
-))}
-</div>
+<div className="panel-hd"><span className="panel-title">🍕 Pentagon Pizza Watch</span><span className={`badge ${pizza?.source==='live'?'':'warn'}`}>{pizza?.source==='live'?'LIVE':'MODELED'}</span></div>
+<div className="scroll"><PizzaPanel pizza={pizza} history={pizzaHist}/></div>
 </aside>
 
-<main className="globe">
-<div className="badge-api"><span className="dot" style={{width:6,height:6}}></span>{dataSource==='live'?'Live API':'Sample'}</div>
+<main className="globe" ref={globeWrap}>
+<div className={`badge-api ${dataSource==='live'?'':'sample'}`}><span className="dot" style={{width:6,height:6,background:dataSource==='live'?'var(--green)':'var(--yellow)'}}></span>{dataSource==='live'?'Live Polymarket':'Sample markets'} · {fmtTime(lastUpd)}</div>
+
+<div className="neh">
+<div className="dc-kicker">NOTHING EVER HAPPENS INDEX</div>
+<div className="neh-row"><span className="neh-score mono" style={{color:nl.c}}>{neh.score}</span><span className="neh-label" style={{color:nl.c}}>{nl.t}</span></div>
+<div className="meter" role="meter" aria-valuenow={neh.score} aria-valuemin="0" aria-valuemax="100"><div className="meter-mark" style={{left:neh.score+'%'}}></div></div>
+<div className="dc-legend"><span>Nothing happens</span><span>It's happening</span></div>
+<div className="neh-drivers">{neh.drivers.map(m=><div key={m.id} className="neh-drv" onClick={()=>setSelected(m)}><span>{m.question}</span><span className="mono">{fmtProb(m.probability)}</span></div>)}</div>
+</div>
 
 {highlighted&&!selected&&(
 <div className="spotlight" onClick={()=>setSelected(highlighted)}>
-<div className="spot-dot"></div>
-<span className="spot-lbl">SPOTLIGHT</span>
-<span className="spot-txt">{highlighted.question.substring(0,40)}...</span>
+<div className="spot-dot"></div><span className="spot-lbl">SPOTLIGHT</span>
+<span className="spot-txt">{highlighted.question}</span>
 <span className="spot-prob" style={{color:highlighted.probability>=0.6?'var(--green)':highlighted.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(highlighted.probability)}</span>
-</div>
-)}
+</div>)}
 
 {selected&&(
 <div className="detail">
 <div className="detail-hd"><div className="detail-q">{selected.question}</div><button className="detail-close" onClick={()=>setSelected(null)}>✕</button></div>
 <div className="detail-stats">
-<div className="detail-stat"><div className="detail-val" style={{color:selected.probability>=0.6?'var(--green)':selected.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(selected.probability)}</div><div className="detail-lbl">Probability</div></div>
+<div className="detail-stat"><div className="detail-val" style={{color:selected.probability>=0.6?'var(--green)':selected.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(selected.probability)}</div><div className="detail-lbl">Yes</div></div>
 <div className="detail-stat"><div className="detail-val">{fmtVol(selected.volume)}</div><div className="detail-lbl">Volume</div></div>
 <div className="detail-stat"><div className="detail-val">{selected.country}</div><div className="detail-lbl">Location</div></div>
 </div>
-{selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on {selected.source==='polymarket'?'Polymarket':'Manifold'} →</a>}
-</div>
-)}
+{selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on Polymarket →</a>}
+</div>)}
 
-<Globe ref={globeEl} globeImageUrl="//unpkg.com/three-globe/example/img/earth-blue-marble.jpg" bumpImageUrl="//unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="//unpkg.com/three-globe/example/img/night-sky.png" polygonsData={countries.features||[]} polygonCapColor={()=>'rgba(0,0,0,0)'} polygonSideColor={()=>'rgba(100,150,200,0.05)'} polygonStrokeColor={()=>'rgba(100,180,255,0.3)'} polygonAltitude={0.005} pointsData={filtered} pointLat="lat" pointLng="lng" pointAltitude={d=>Math.min(0.05+d.volume/50000000,0.18)} pointRadius={d=>(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35} pointColor={d=>d.category==='Trump'?'#dc2626':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'} pointLabel={d=>'<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">'+d.source.toUpperCase()+' • '+d.country+'</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">'+d.question+'</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">'+fmtProb(d.probability)+'</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">'+fmtVol(d.volume)+'</div></div></div></div>'} onPointClick={setSelected} arcsData={arcs} arcStartLat="startLat" arcStartLng="startLng" arcEndLat="endLat" arcEndLng="endLng" arcColor="color" arcAltitude="altitude" arcStroke="stroke" arcDashLength="dashLength" arcDashGap="dashGap" arcDashAnimateTime="dashAnimateTime" ringsData={rings} ringLat="lat" ringLng="lng" ringMaxRadius="maxR" ringPropagationSpeed="propagationSpeed" ringRepeatPeriod="repeatPeriod" ringColor="color" atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>
+{gsize.w>0&&<Globe ref={globeEl} width={gsize.w} height={gsize.h} globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg" bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="https://unpkg.com/three-globe/example/img/night-sky.png"
+polygonsData={countries.features||[]} polygonCapColor={()=>'rgba(0,0,0,0)'} polygonSideColor={()=>'rgba(100,150,200,0.05)'} polygonStrokeColor={()=>'rgba(100,180,255,0.25)'} polygonAltitude={0.005}
+pointsData={[...filtered,...shopPoints]} pointLat="lat" pointLng="lng"
+pointAltitude={d=>d.isShop?0.01+(d.ratio||0)*0.02:Math.min(0.05+d.volume/50000000,0.18)}
+pointRadius={d=>d.isShop?0.12:(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35}
+pointColor={d=>d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'}
+pointLabel={d=>d.isShop?'<div style="background:rgba(10,15,26,0.95);padding:8px 10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3)"><div style="font-weight:700;color:white;font-size:11px">🍕 '+d.name+'</div><div style="color:#94a3b8;font-size:10px">'+SHOP_STATUS(d.ratio).t+(d.ratio!=null?' · '+Math.round(d.ratio*100)+'% of usual':'')+'</div></div>':'<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">'+d.source.toUpperCase()+' • '+d.country+'</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">'+d.question+'</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">'+fmtProb(d.probability)+'</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">'+fmtVol(d.volume)+'</div></div></div></div>'}
+onPointClick={d=>{if(!d.isShop)setSelected(d)}}
+labelsData={[{lat:PENTAGON.lat,lng:PENTAGON.lng,text:'PENTAGON'}]} labelLat="lat" labelLng="lng" labelText="text" labelSize={0.6} labelDotRadius={0.25} labelColor={()=>DOUGHCON[dc].color} labelResolution={2}
+arcsData={arcs} arcStartLat="startLat" arcStartLng="startLng" arcEndLat="endLat" arcEndLng="endLng" arcColor="color" arcAltitude="altitude" arcStroke="stroke" arcDashLength="dashLength" arcDashGap="dashGap" arcDashAnimateTime="dashAnimateTime"
+ringsData={rings} ringLat="lat" ringLng="lng" ringMaxRadius="maxR" ringPropagationSpeed="propagationSpeed" ringRepeatPeriod="repeatPeriod" ringColor={d=>t=>{const c=d.color;return c.startsWith('#')?c+Math.round((1-t)*200).toString(16).padStart(2,'0'):c}}
+atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}
 </main>
 
 <aside className="right">
 <div className="act-tabs">
-<button className={`act-tab ${tab==='activity'?'active':''}`} onClick={()=>setTab('activity')}>🔴 Activity</button>
-<button className={`act-tab ${tab==='news'?'active':''}`} onClick={()=>setTab('news')}>📰 Live News</button>
+<button className={`act-tab ${tab==='news'?'active':''}`} onClick={()=>setTab('news')}>📰 Intel Feed</button>
+<button className={`act-tab ${tab==='markets'?'active':''}`} onClick={()=>setTab('markets')}>📊 Markets</button>
+<button className={`act-tab ${tab==='activity'?'active':''}`} onClick={()=>setTab('activity')}>🔴 Flow</button>
 </div>
-{tab==='activity'?(
-<div className="feed">
-{activities.map(a=>(
-<div key={a.id} className={`act ${a.isWhale?'whale':''}`}>
-<span className="act-icon">{a.isWhale?'🐋':a.action==='BUY'?'📈':'📉'}</span>
-<div className="act-content"><div className="act-title">{a.market}</div><div className="act-meta"><span className={`act-amt ${a.action.toLowerCase()}`}>{a.action} ${a.amount.toLocaleString()}</span> • {a.source}</div></div>
-<span className="act-time">{fmtTime(a.time)}</span>
-</div>
-))}
-</div>
-):(
-<div className="feed">
-<div style={{padding:'8px 10px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-<span style={{fontSize:10,color:'var(--muted)'}}>Source: <span className={`news-status ${newsSource==='rss'?'rss':''}`}>{newsSource==='newsapi'?'⚡ NewsAPI':newsSource==='rss'?'📡 RSS Feeds':'⏳ Connecting'}</span></span>
+<div className="scroll">
+{tab==='news'&&(<>
+<div style={{padding:'0 2px 8px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+<span className={`news-status ${newsSource==='rss'?'rss':''}`}>{newsSource==='newsapi'?'⚡ NewsAPI':newsSource==='rss'?'📡 RSS Feeds':'⏳ Connecting'}</span>
 {newsLastUpd&&<span style={{fontSize:9,color:'var(--muted)'}}>Updated {fmtTime(newsLastUpd)}</span>}
 </div>
-{newsLoading?<div className="news-loading">⏳ Fetching live news...</div>:news.length===0?<div className="news-loading">No news available</div>:news.slice(0,15).map(n=>(
+{newsLoading?<div className="news-loading">⏳ Fetching live news...</div>:news.length===0?<div className="news-loading">No news available</div>:news.slice(0,20).map(n=>{const tg=newsTag(n.title);return(
 <a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer" className={`news ${n.isBreaking?'breaking':''}`}>
-<div className="news-src">{n.isBreaking&&<span className="dot red" style={{width:6,height:6,display:'inline-block',marginRight:4}}></span>}{n.source}</div>
+<div className="news-src">{n.isBreaking&&<span className="dot red" style={{width:6,height:6}}></span>}{n.source}{tg&&<span className={`tag ${tg}`}>{tg}</span>}</div>
 <div className="news-title">{n.title}</div>
 <div className="news-time">{fmtTime(n.time)}</div>
-</a>
-))}
+</a>)})}
+</>)}
+{tab==='markets'&&(<>
+<div className="tabs">{cats.map(c=><button key={c} className={`tab ${catFilter===c?'active':''}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
+{filtered.slice(0,40).map(m=>(
+<div key={m.id} className={`card ${selected?.id===m.id?'sel':''}`} onClick={()=>setSelected(m)}>
+<div className="src">{m.source==='polymarket'?'◆ Polymarket':'◇ Manifold'} · {m.category}</div>
+<div className="q">{m.question}</div>
+<div className="row"><span className={`prob ${m.probability>=0.7?'hi':m.probability>=0.4?'md':'lo'}`}>{fmtProb(m.probability)}</span><span className="vol">{fmtVol(m.volume)}</span></div>
+</div>))}
+</>)}
+{tab==='activity'&&(<>
+<div className="note" style={{paddingTop:0}}>⚠ Simulated order flow for illustration — not real trades.</div>
+{activities.map(a=>(
+<div key={a.id} className={`act ${a.isWhale?'whale':''}`}>
+<span>{a.isWhale?'🐋':a.action==='BUY'?'📈':'📉'}</span>
+<div className="act-content"><div className="act-title">{a.market}</div><div className="act-meta"><span className={`act-amt ${a.action.toLowerCase()}`}>{a.action} ${a.amount.toLocaleString()}</span> • {a.source}</div></div>
+<span className="act-time">{fmtTime(a.time)}</span>
+</div>))}
+</>)}
 </div>
-)}
 </aside>
 
 <div className="ticker">
