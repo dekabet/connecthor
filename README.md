@@ -1,17 +1,28 @@
-# 🌐 Polyglobe
+# ⚡ ConnecTHOR
 
-Real-Time Geopolitical Market Intelligence - A 3D globe visualization of Polymarket prediction markets.
-
-![Polyglobe Preview](https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800)
+Pentagon Pizza Index + geopolitical prediction-market intel on a 3D globe, in a single static `index.html`. Inspired by [PizzINT](https://www.pizzint.watch/).
 
 ## Features
 
-- **Interactive 3D Globe** - Rotate, zoom, and explore markets worldwide
-- **Live Market Data** - Prediction market odds from Polymarket
-- **OSINT Layer** - Breaking news and intelligence markers
-- **Color-coded Probabilities** - Green (high), Yellow (uncertain), Red (low)
-- **Volume Indicators** - Marker height based on trading volume
-- **Direct Trading Links** - Click through to trade on Polymarket
+- **🍕 Pentagon Pizza Watch** - "Popular Times"-style busyness charts for pizza shops near the Pentagon, each scored against its usual level for that hour (QUIET / NOMINAL / BUSY / SPIKE)
+- **DOUGHCON level** - a DEFCON-style 5→1 alert level driven by the combined pizza index, with a 24-hour history sparkline
+- **📉 Nothing Ever Happens Index** - 0-100 tension score from the volume-weighted odds of conflict/escalation markets (ceasefire markets inverted), with the top driving markets
+- **Interactive 3D Globe** - Polymarket markets, Pentagon beacon whose pulse speeds up with DOUGHCON, pizza shops, arcs to hotspots
+- **Intel Feed** - live world news (BBC, NYT, Al Jazeera, NPR, Guardian via RSS) tagged MILITARY / DIPLOMACY / ECONOMY, plus a breaking ticker
+- **Markets tab** - live Polymarket odds streamed in real time, 24h change and volume
+- **Flow tab** - real Polymarket trades with a whale filter; whale trades arc across the globe
+
+### About the pizza data
+
+Google Maps Popular Times has no public API and can't be read from a static page, so out of the box the pizza busyness is **modeled**: typical hourly curves per shop plus deterministic noise and occasional correlated surges (every viewer sees the same values at the same time). The panel is badged `MODELED` while this is the case.
+
+To use real data, run your own collector and set `PIZZA_DATA_URL` in `index.html` to a JSON endpoint returning:
+
+```json
+{"updated":"2026-10-08T20:00:00Z","shops":[{"id":"dominos-pc","live":72,"typical":[0,0,0,0,0,0,0,0,0,0,10,25,45,40,30,28,35,55,70,72,60,45,30,15]}]}
+```
+
+`id` must match an entry in `SHOPS`; `typical` is 24 hourly values (0-100, ET).
 
 ## 🚀 Deploy to GitHub Pages
 
@@ -52,46 +63,24 @@ Real-Time Geopolitical Market Intelligence - A 3D globe visualization of Polymar
 4. Click "Commit changes"
 5. Enable Pages in Settings
 
-## 📊 API Integration
+## 📊 Polymarket connections
 
-### Polymarket Gamma API
+All public and keyless; every REST call tries a direct request first, then falls back to CORS proxies.
 
-The app can fetch live data from Polymarket's public API:
+| Connection | Endpoint | Used for |
+|---|---|---|
+| Gamma API | `gamma-api.polymarket.com/events` (geopolitics, world, politics, middle-east, economy tags + top 24h volume) | Markets on the globe, odds, 24h change, 24h volume, liquidity, bid/ask |
+| CLOB WebSocket | `wss://ws-subscriptions-clob.polymarket.com/ws/market` | Live price updates for the 100 busiest markets (header shows **Price stream LIVE**) |
+| Data API | `data-api.polymarket.com/trades` (polled every 15s) | Real trade flow, whale filter (≥ $5K), globe pulses and whale arcs, ticker |
+| CLOB REST | `clob.polymarket.com/prices-history` | 7-day price chart in the market detail panel |
 
-```javascript
-// Fetch active geopolitical markets
-fetch('https://gamma-api.polymarket.com/events?tag=politics&closed=false&limit=50')
-  .then(res => res.json())
-  .then(data => {
-    // Process markets
-    data.forEach(event => {
-      console.log(event.title, event.markets);
-    });
-  });
-```
-
-### Key Endpoints
-
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /events` | List events with markets |
-| `GET /markets` | Individual market details |
-| `GET /markets?slug={slug}` | Get market by slug |
-
-### CORS Note
-
-For production use, you'll need a CORS proxy or backend service to fetch Polymarket data, as the API doesn't support browser CORS.
-
-Options:
-- Use a serverless function (Vercel, Netlify Functions)
-- Set up a simple proxy with Cloudflare Workers
-- Use [cors-anywhere](https://github.com/Rob--W/cors-anywhere)
+Globe arcs connect every location a market mentions (e.g. *Israel strike on Iran* draws Israel ↔ Iran). If Polymarket is unreachable the page falls back to sample markets and a clearly labelled simulated flow.
 
 ## 🛠️ Customization
 
 ### Add Your Own Markets
 
-Edit the `SAMPLE_MARKETS` array in `index.html`:
+Edit the `MARKETS` array in `index.html`:
 
 ```javascript
 const SAMPLE_MARKETS = [
@@ -109,7 +98,7 @@ const SAMPLE_MARKETS = [
 
 ### Add Location Keywords
 
-Expand the `LOCATIONS` object to map new keywords:
+Expand the `LOCS` object to map new keywords:
 
 ```javascript
 const LOCATIONS = {
