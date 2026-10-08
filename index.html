@@ -166,7 +166,16 @@
   </style>
 </head>
 <body>
-<div id="root"></div>
+<div id="root"><div class="loading"><div style="font-size:56px">⚡</div><h2 style="margin-top:12px;font-size:22px;font-weight:800">ConnecTHOR</h2><p id="boot-msg" style="margin-top:8px;color:#94a3b8;font-size:13px;max-width:420px;text-align:center;padding:0 16px">Loading…</p></div></div>
+<script>
+// If the app never mounts, say why instead of leaving a blank page
+(function(){
+  var msg=function(t){var el=document.getElementById('boot-msg');if(el){el.innerHTML=t;el.style.color='#fca5a5'}};
+  window.addEventListener('error',function(e){if(!window.__booted)msg('Something failed while starting: '+(e.message||'a script could not load')+'.<br>Try a hard refresh, or disable ad/script blockers for this site.')},true);
+  setTimeout(function(){if(window.__booted)return;var miss=[!window.React&&'React',!window.ReactDOM&&'ReactDOM',!window.Globe&&'globe.gl',!window.Babel&&'Babel'].filter(Boolean);
+    msg(miss.length?'Could not load '+miss.join(', ')+' from unpkg.com.<br>Check your connection, or whether an ad/script blocker is blocking unpkg.com.':'Still starting… this is taking longer than usual.')},15000);
+})();
+</script>
 <script type="text/babel">
 const{useState,useEffect,useRef,useMemo}=React;
 const Globe=window.Globe;
@@ -846,6 +855,7 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}
 );
 }
 
+window.__booted=true;
 ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
