@@ -88,7 +88,7 @@
     .spot-lbl{font-size:10px;font-weight:700;color:var(--blue)}
     .spot-txt{font-size:13px;max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .spot-prob{font-size:16px;font-weight:800}
-    .detail{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:60;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 24px;min-width:min(380px,92%)}
+    .detail{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);z-index:60;width:min(440px,92%);background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px 24px;min-width:min(380px,92%)}
     .detail-hd{display:flex;justify-content:space-between;margin-bottom:12px}
     .detail-q{font-size:14px;font-weight:700;flex:1;margin-right:12px}
     .detail-close{background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px}
@@ -116,6 +116,10 @@
     .prob{font-size:17px;font-weight:800}
     .prob.hi{color:var(--green)}.prob.md{color:var(--yellow)}.prob.lo{color:var(--red)}
     .vol{font-size:11px;color:var(--muted)}
+    .flash-up{animation:flashUp 2s ease-out}.flash-down{animation:flashDown 2s ease-out}
+    @keyframes flashUp{0%{background:rgba(34,197,94,0.35)}100%{background:transparent}}
+    @keyframes flashDown{0%{background:rgba(239,68,68,0.35)}100%{background:transparent}}
+    .prob{border-radius:4px;padding:0 2px}
     .act{display:flex;align-items:center;gap:10px;padding:9px;border-radius:8px;margin-bottom:4px;background:var(--card2);border:1px solid var(--border)}
     .act.whale{border-color:var(--yellow);background:rgba(234,179,8,0.1)}
     .act-content{flex:1;min-width:0}
@@ -372,18 +376,113 @@ const MARKETS=[
 {id:'20',question:'NATO invokes Article 5 in 2026?',probability:0.03,volume:2600000,source:'polymarket',lat:50.88,lng:4.42,country:'NATO',category:'Conflict'},
 ];
 
-const PROXIES=['','https://corsproxy.io/?','https://api.allorigins.win/raw?url='];
-const LOCS={trump:{lat:38.9,lng:-77,c:'USA'},'united states':{lat:38.9,lng:-77,c:'USA'},'u.s.':{lat:38.9,lng:-77,c:'USA'},fed:{lat:38.89,lng:-77.04,c:'USA'},ukraine:{lat:48.38,lng:31.17,c:'Ukraine'},crimea:{lat:45.3,lng:34.1,c:'Ukraine'},russia:{lat:55.76,lng:37.62,c:'Russia'},putin:{lat:55.76,lng:37.62,c:'Russia'},china:{lat:39.9,lng:116.4,c:'China'},xi:{lat:39.9,lng:116.4,c:'China'},taiwan:{lat:25.03,lng:121.57,c:'Taiwan'},iran:{lat:35.69,lng:51.39,c:'Iran'},israel:{lat:31.77,lng:35.22,c:'Israel'},gaza:{lat:31.5,lng:34.47,c:'Gaza'},hamas:{lat:31.5,lng:34.47,c:'Gaza'},lebanon:{lat:33.89,lng:35.5,c:'Lebanon'},syria:{lat:33.51,lng:36.29,c:'Syria'},yemen:{lat:15.37,lng:44.19,c:'Yemen'},venezuela:{lat:10.49,lng:-66.88,c:'Venezuela'},maduro:{lat:10.49,lng:-66.88,c:'Venezuela'},'north korea':{lat:39.03,lng:125.75,c:'North Korea'},'south korea':{lat:37.57,lng:126.98,c:'South Korea'},india:{lat:28.61,lng:77.21,c:'India'},pakistan:{lat:33.68,lng:73.05,c:'Pakistan'},greenland:{lat:64.18,lng:-51.72,c:'Greenland'},nato:{lat:50.88,lng:4.42,c:'NATO'},' eu ':{lat:50.85,lng:4.35,c:'EU'},france:{lat:48.86,lng:2.35,c:'France'},macron:{lat:48.86,lng:2.35,c:'France'},germany:{lat:52.52,lng:13.4,c:'Germany'},' uk ':{lat:51.51,lng:-0.13,c:'UK'},japan:{lat:35.68,lng:139.69,c:'Japan'},mexico:{lat:19.43,lng:-99.13,c:'Mexico'},canada:{lat:45.42,lng:-75.7,c:'Canada'},bitcoin:{lat:37.77,lng:-122.42,c:'USA'}};
+// ============ POLYMARKET ============
+// Public, keyless endpoints: Gamma (events/markets), Data API (trades), CLOB (price history)
+// and the CLOB market WebSocket (live prices). REST calls try direct first, then CORS proxies,
+// and remember whichever route worked.
+const GAMMA='https://gamma-api.polymarket.com',DATA_API='https://data-api.polymarket.com',CLOB='https://clob.polymarket.com';
+const CLOB_WS='wss://ws-subscriptions-clob.polymarket.com/ws/market';
+const PROXIES=['','https://corsproxy.io/?url=','https://api.allorigins.win/raw?url='];
+let workingProxy=0;
+async function getJSON(url,timeout=8000){
+  const order=[workingProxy,...PROXIES.keys()].filter((v,i,a)=>a.indexOf(v)===i);let err;
+  for(const i of order){try{const r=await fetch(PROXIES[i]?PROXIES[i]+encodeURIComponent(url):url,{signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();workingProxy=i;return d}catch(e){err=e}}
+  throw err;
+}
+// Gamma returns outcomes/outcomePrices/clobTokenIds as JSON-encoded strings
+const parseArr=v=>{if(Array.isArray(v))return v;try{const x=JSON.parse(v);return Array.isArray(x)?x:[]}catch(e){return typeof v==='string'?v.split(','):[]}};
+const num=v=>{const n=parseFloat(v);return isFinite(n)?n:0};
+// Polymarket's displayed price: bid/ask midpoint, or last trade when the spread is wide
+const displayPrice=(bid,ask,last)=>bid>0&&ask>0&&ask-bid<=0.1?(bid+ask)/2:last;
+const WHALE_USD=5000;
+const POLY_FEEDS=['tag_slug=geopolitics','tag_slug=world','tag_slug=politics','tag_slug=middle-east','tag_slug=economy',''];
+
+const LOCS={trump:{lat:38.9,lng:-77,c:'USA'},'united states':{lat:38.9,lng:-77,c:'USA'},'u.s.':{lat:38.9,lng:-77,c:'USA'},fed:{lat:38.89,lng:-77.04,c:'USA'},ukraine:{lat:48.38,lng:31.17,c:'Ukraine'},crimea:{lat:45.3,lng:34.1,c:'Ukraine'},russia:{lat:55.76,lng:37.62,c:'Russia'},putin:{lat:55.76,lng:37.62,c:'Russia'},china:{lat:39.9,lng:116.4,c:'China'},xi:{lat:39.9,lng:116.4,c:'China'},taiwan:{lat:25.03,lng:121.57,c:'Taiwan'},iran:{lat:35.69,lng:51.39,c:'Iran'},israel:{lat:31.77,lng:35.22,c:'Israel'},gaza:{lat:31.5,lng:34.47,c:'Gaza'},hamas:{lat:31.5,lng:34.47,c:'Gaza'},lebanon:{lat:33.89,lng:35.5,c:'Lebanon'},syria:{lat:33.51,lng:36.29,c:'Syria'},yemen:{lat:15.37,lng:44.19,c:'Yemen'},venezuela:{lat:10.49,lng:-66.88,c:'Venezuela'},maduro:{lat:10.49,lng:-66.88,c:'Venezuela'},'north korea':{lat:39.03,lng:125.75,c:'North Korea'},'south korea':{lat:37.57,lng:126.98,c:'South Korea'},india:{lat:28.61,lng:77.21,c:'India'},pakistan:{lat:33.68,lng:73.05,c:'Pakistan'},greenland:{lat:64.18,lng:-51.72,c:'Greenland'},nato:{lat:50.88,lng:4.42,c:'NATO'},' eu ':{lat:50.85,lng:4.35,c:'EU'},france:{lat:48.86,lng:2.35,c:'France'},macron:{lat:48.86,lng:2.35,c:'France'},germany:{lat:52.52,lng:13.4,c:'Germany'},' uk ':{lat:51.51,lng:-0.13,c:'UK'},japan:{lat:35.68,lng:139.69,c:'Japan'},mexico:{lat:19.43,lng:-99.13,c:'Mexico'},canada:{lat:45.42,lng:-75.7,c:'Canada'},bitcoin:{lat:37.77,lng:-122.42,c:'USA'},kyiv:{lat:50.45,lng:30.52,c:'Ukraine'},zelensky:{lat:50.45,lng:30.52,c:'Ukraine'},moscow:{lat:55.76,lng:37.62,c:'Russia'},kremlin:{lat:55.76,lng:37.62,c:'Russia'},beijing:{lat:39.9,lng:116.4,c:'China'},tehran:{lat:35.69,lng:51.39,c:'Iran'},khamenei:{lat:35.69,lng:51.39,c:'Iran'},netanyahu:{lat:31.77,lng:35.22,c:'Israel'},hezbollah:{lat:33.89,lng:35.5,c:'Lebanon'},houthi:{lat:15.37,lng:44.19,c:'Yemen'},'kim jong':{lat:39.03,lng:125.75,c:'North Korea'},saudi:{lat:24.71,lng:46.68,c:'Saudi Arabia'},qatar:{lat:25.29,lng:51.53,c:'Qatar'},egypt:{lat:30.04,lng:31.24,c:'Egypt'},turkey:{lat:39.93,lng:32.86,c:'Turkey'},erdogan:{lat:39.93,lng:32.86,c:'Turkey'},modi:{lat:28.61,lng:77.21,c:'India'},starmer:{lat:51.51,lng:-0.13,c:'UK'},britain:{lat:51.51,lng:-0.13,c:'UK'},brazil:{lat:-15.79,lng:-47.88,c:'Brazil'},argentina:{lat:-34.6,lng:-58.38,c:'Argentina'},colombia:{lat:4.71,lng:-74.07,c:'Colombia'},cuba:{lat:23.11,lng:-82.37,c:'Cuba'},panama:{lat:8.98,lng:-79.52,c:'Panama'},poland:{lat:52.23,lng:21.01,c:'Poland'},hungary:{lat:47.5,lng:19.04,c:'Hungary'},serbia:{lat:44.79,lng:20.45,c:'Serbia'},sudan:{lat:15.5,lng:32.56,c:'Sudan'},congo:{lat:-4.32,lng:15.31,c:'DR Congo'},ethiopia:{lat:9.03,lng:38.74,c:'Ethiopia'},somalia:{lat:2.05,lng:45.32,c:'Somalia'},philippines:{lat:14.6,lng:120.98,c:'Philippines'},vietnam:{lat:21.03,lng:105.85,c:'Vietnam'},australia:{lat:-35.28,lng:149.13,c:'Australia'},'south africa':{lat:-25.75,lng:28.19,c:'South Africa'},nigeria:{lat:9.08,lng:7.4,c:'Nigeria'}};
 
 const CONFLICT_RE=/\b(war|invade|invasion|strike|attack|nuclear|military|ceasefire|missile|clash|troops|icbm|article 5|bomb)/i;
-function getLoc(q){const l=' '+q.toLowerCase()+' ';for(const[k,v]of Object.entries(LOCS)){if(l.includes(k))return{lat:v.lat+(Math.random()-0.5)*1.5,lng:v.lng+(Math.random()-0.5)*1.5,country:v.c}}return null}
+// All places a question mentions, in the order they appear; the first is where the market sits
+function getLocs(q){
+  const l=' '+q.toLowerCase()+' ',hits=[];
+  for(const[k,v]of Object.entries(LOCS)){const i=l.indexOf(k);if(i>=0)hits.push({i,...v})}
+  hits.sort((a,b)=>a.i-b.i);const seen=new Set();
+  return hits.filter(h=>!seen.has(h.c)&&seen.add(h.c)).map(h=>({lat:h.lat,lng:h.lng,country:h.c}));
+}
+function getLoc(q){const ls=getLocs(q);if(!ls.length)return null;const j=hash(q),k=hash(q+'#');return{lat:ls[0].lat+(j-0.5)*1.5,lng:ls[0].lng+(k-0.5)*1.5,country:ls[0].country,links:ls.slice(1)}}
 function getCat(q){const l=q.toLowerCase();if(CONFLICT_RE.test(l))return'Conflict';if(l.includes('trump'))return'Trump';if(l.includes('bitcoin')||l.includes('recession')||l.includes('fed ')||l.includes('rate'))return'Economy';if(l.includes('tariff'))return'Trade';return'Politics'}
 const fmtProb=p=>Math.round(p*100)+'%';
 const fmtVol=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':v>=1e3?'$'+(v/1e3).toFixed(0)+'K':'$'+Math.round(v);
 const fmtTime=d=>{const t=new Date(d).getTime();if(isNaN(t))return'';const m=Math.floor((Date.now()-t)/60000);if(m<1)return'Just now';if(m<60)return m+'m ago';return Math.floor(m/60)+'h ago'};
 const fmtHour=h=>{const x=Math.floor(h)%24;return(x%12||12)+(x<12?'a':'p')};
+const fmtChg=c=>(c>0?'▲':c<0?'▼':'')+Math.abs(c*100).toFixed(1);
+const fmtCents=p=>(p*100).toFixed(p<0.01||p>0.99?1:0)+'¢';
 
-async function fetchPoly(){const base='https://gamma-api.polymarket.com/events?closed=false&active=true&limit=100&order=volume&ascending=false';for(const p of PROXIES){try{const url=p?p+encodeURIComponent(base):base;const r=await fetch(url,{signal:AbortSignal.timeout(8000)});if(!r.ok)continue;const d=await r.json();if(!Array.isArray(d))continue;const ms=[];for(const e of d){if(!e.markets?.length)continue;const m=e.markets[0];const q=e.title||m.question||'';const loc=getLoc(q);if(!loc)continue;let prob=0.5;try{const pr=typeof m.outcomePrices==='string'?JSON.parse(m.outcomePrices):m.outcomePrices;prob=parseFloat(pr[0])||0.5}catch(x){}ms.push({id:m.id||e.id,question:q,probability:prob,volume:parseFloat(e.volume||m.volume||0),source:'polymarket',slug:e.slug,url:'https://polymarket.com/event/'+e.slug,...loc,category:getCat(q)});}if(ms.length>0)return ms}catch(x){}}return[]}
+function parseEvent(e){
+  const ms=(e.markets||[]).filter(m=>m.active!==false&&!m.closed);
+  if(!ms.length)return null;
+  // single-market events read best by the event title; multi-outcome events by their busiest market
+  const m=ms.length===1?ms[0]:[...ms].sort((a,b)=>num(b.volumeNum??b.volume)-num(a.volumeNum??a.volume))[0];
+  const question=ms.length===1?(e.title||m.question):(m.question||e.title);
+  const loc=getLoc(question+' '+(e.title||''));if(!loc)return null;
+  const prices=parseArr(m.outcomePrices).map(num),tokens=parseArr(m.clobTokenIds),outcomes=parseArr(m.outcomes);
+  const bid=num(m.bestBid),ask=num(m.bestAsk);
+  return{id:String(m.id||e.id),eventId:String(e.id),conditionId:m.conditionId,tokenYes:tokens[0]?String(tokens[0]):null,outcome:outcomes[0]||'Yes',
+    question,eventTitle:e.title,probability:displayPrice(bid,ask,num(m.lastTradePrice)||prices[0]||0.5),bid,ask,
+    change24:num(m.oneDayPriceChange),volume:num(e.volume)||num(m.volumeNum??m.volume),vol24:num(e.volume24hr)||num(m.volume24hr),liquidity:num(e.liquidity)||num(m.liquidityNum??m.liquidity),
+    endDate:m.endDate||e.endDate,source:'polymarket',slug:e.slug,url:'https://polymarket.com/event/'+e.slug,...loc,category:getCat(question)};
+}
+
+async function fetchPoly(){
+  const res=await Promise.allSettled(POLY_FEEDS.map(q=>getJSON(`${GAMMA}/events?closed=false&active=true&limit=100&order=volume24hr&ascending=false${q?'&'+q:''}`)));
+  const byId=new Map();
+  res.forEach(r=>{if(r.status==='fulfilled'&&Array.isArray(r.value))r.value.forEach(e=>{if(!byId.has(e.id)){const m=parseEvent(e);if(m)byId.set(e.id,m)}})});
+  return[...byId.values()].sort((a,b)=>b.vol24-a.vol24||b.volume-a.volume);
+}
+
+// Recent fills across all of Polymarket, newest first
+async function fetchTrades(){
+  let d;
+  try{d=await getJSON(`${DATA_API}/trades?limit=200&takerOnly=true&filterType=CASH&filterAmount=100`)}
+  catch(e){d=await getJSON(`${DATA_API}/trades?limit=200`)}
+  if(!Array.isArray(d))throw new Error('bad trades response');
+  return d.map(t=>{const w=t.proxyWallet||'';return{id:[t.transactionHash,t.asset,t.timestamp,t.size].join(':'),conditionId:t.conditionId,title:t.title||'',outcome:t.outcome||'',side:t.side,price:num(t.price),usd:num(t.size)*num(t.price),
+    time:new Date(num(t.timestamp)*(num(t.timestamp)<1e12?1000:1)),who:t.pseudonym||t.name||(w?w.slice(0,6)+'…'+w.slice(-4):'anon'),url:t.eventSlug?'https://polymarket.com/event/'+t.eventSlug:null}}).filter(t=>t.usd>0);
+}
+
+async function fetchHistory(token){
+  const d=await getJSON(`${CLOB}/prices-history?market=${token}&interval=1w&fidelity=60`);
+  return(d.history||[]).map(x=>({t:num(x.t)*1000,p:num(x.p)})).filter(x=>x.t>0);
+}
+
+// Live prices over the CLOB market WebSocket. Calls onPrices({tokenId:{bid,ask,last}}) about once a second.
+function useLivePrices(tokens,onPrices){
+  const[status,setStatus]=useState('off');
+  const cb=useRef(onPrices);cb.current=onPrices;
+  const key=tokens.join(',');
+  useEffect(()=>{
+    if(!tokens.length||typeof WebSocket==='undefined')return;
+    let ws,ping,flush,retry,dead=false,attempt=0;const book={},dirty=new Set();
+    const set=(id,patch)=>{if(!id)return;book[id]={...book[id],...patch};dirty.add(id)};
+    const handle=ev=>{
+      if(!ev||typeof ev!=='object')return;
+      const t=ev.event_type;
+      if(t==='book'){const bids=(ev.bids||[]).map(x=>num(x.price)),asks=(ev.asks||[]).map(x=>num(x.price));set(ev.asset_id,{bid:bids.length?Math.max(...bids):0,ask:asks.length?Math.min(...asks):0})}
+      else if(t==='price_change'){(ev.price_changes||[]).forEach(c=>{if(c.best_bid!=null||c.best_ask!=null)set(c.asset_id,{bid:num(c.best_bid),ask:num(c.best_ask)})})}
+      else if(t==='best_bid_ask')set(ev.asset_id,{bid:num(ev.best_bid),ask:num(ev.best_ask)});
+      else if(t==='last_trade_price')set(ev.asset_id,{last:num(ev.price)});
+    };
+    const connect=()=>{
+      setStatus('connecting');ws=new WebSocket(CLOB_WS);
+      ws.onopen=()=>{attempt=0;setStatus('live');ws.send(JSON.stringify({assets_ids:tokens,type:'market'}));ping=setInterval(()=>{if(ws.readyState===1)ws.send('PING')},10000)};
+      ws.onmessage=m=>{if(typeof m.data!=='string'||m.data==='PONG')return;try{const d=JSON.parse(m.data);(Array.isArray(d)?d:[d]).forEach(handle)}catch(e){}};
+      ws.onclose=()=>{clearInterval(ping);if(dead)return;setStatus('off');retry=setTimeout(connect,Math.min(30000,2000*2**attempt++))};
+      ws.onerror=()=>ws.close();
+    };
+    connect();
+    flush=setInterval(()=>{if(!dirty.size)return;const out={};dirty.forEach(id=>out[id]=book[id]);dirty.clear();cb.current(out)},1000);
+    return()=>{dead=true;clearInterval(ping);clearInterval(flush);clearTimeout(retry);if(ws)ws.close()};
+  },[key]);
+  return status;
+}
 
 // ============ NOTHING EVER HAPPENS INDEX ============
 // Volume-weighted probability of escalation across conflict markets (ceasefire/peace
@@ -400,7 +499,17 @@ const nehLabel=s=>s<20?{t:'Nothing ever happens',c:'#22c55e'}:s<35?{t:'Simmering
 
 function newsTag(title){if(/military|troops|strike|missile|army|navy|air force|drone|attack|war\b|pentagon|defen[cs]e|bomb|killed|soldier/i.test(title))return'MILITARY';if(/talks|summit|ceasefire|sanction|treaty|minister|diplomat|\bun\b|nato|envoy|election/i.test(title))return'DIPLOMACY';if(/market|tariff|econom|inflation|stocks|oil|trade|bank/i.test(title))return'ECONOMY';return null}
 
-function genArcs(ms){return ms.filter(m=>m.volume>1e6&&m.lat).slice(0,10).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.7,dashLength:0.4,dashGap:0.2,dashAnimateTime:1500+i*200,altitude:0.1+(i%3)*0.05}))}
+// Arcs connect every place a market names (e.g. "Israel strike on Iran" → Israel ↔ Iran),
+// plus Washington → the busiest US-linked hotspots
+const ARC_COLORS={Conflict:['rgba(249,115,22,0.8)','rgba(239,68,68,0.25)'],Trump:['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)'],Economy:['rgba(34,197,94,0.7)','rgba(34,197,94,0.15)']};
+function genArcs(ms,flows){
+  const out=[],seen=new Set();
+  ms.forEach(m=>(m.links||[]).forEach(l=>{const k=[m.country,l.country].sort().join('|');if(seen.has(k)||out.length>=40)return;seen.add(k);
+    out.push({startLat:m.lat,startLng:m.lng,endLat:l.lat,endLng:l.lng,color:ARC_COLORS[m.category]||['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.5+Math.min(m.vol24/2e6,1),dashLength:0.5,dashGap:0.15,dashAnimateTime:2000+out.length*137%1500,altitude:null})}));
+  genArcsDC(ms.filter(m=>m.country!=='USA'&&!(m.links||[]).some(l=>l.country==='USA'))).forEach(a=>out.push(a));
+  return out.concat(flows||[]);
+}
+function genArcsDC(ms){return ms.filter(m=>m.volume>1e6&&m.lat).slice(0,6).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.4,dashLength:0.3,dashGap:0.3,dashAnimateTime:2500+i*200,altitude:0.1+(i%3)*0.05}))}
 function genRings(ms,hl,dc){const rs=ms.filter(m=>m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:2,propagationSpeed:1.5,repeatPeriod:1200+i*200,color:tensionOf(m)>0.5&&m.category==='Conflict'?'rgba(239,68,68,0.5)':'rgba(59,130,246,0.4)'}));rs.push({lat:PENTAGON.lat,lng:PENTAGON.lng,maxR:2+(5-dc)*1.5,propagationSpeed:1+(5-dc)*0.8,repeatPeriod:Math.max(400,1600-(5-dc)*300),color:DOUGHCON[dc].color});if(hl)rs.unshift({lat:hl.lat,lng:hl.lng,maxR:5,propagationSpeed:3,repeatPeriod:800,color:'rgba(255,255,255,0.6)'});return rs}
 function genActs(ms){const a=[];const amts=[500,1000,2500,5000,10000,25000];for(let i=0;i<14;i++){const m=ms[Math.floor(Math.random()*Math.min(ms.length,15))];if(!m)continue;const amt=amts[Math.floor(Math.random()*amts.length)];a.push({id:'a-'+i,market:m.question,action:Math.random()<0.5?'BUY':'SELL',amount:amt,isWhale:amt>=10000,time:new Date(Date.now()-Math.random()*300000),source:m.source})}return a.sort((x,y)=>y.time-x.time)}
 
@@ -455,6 +564,28 @@ function Sparkline({data}){
   </div>);
 }
 
+// 7-day Yes price for the selected market
+function PriceChart({data}){
+  const[hov,setHov]=useState(null);
+  if(!data)return<div className="chart-readout">Loading price history…</div>;
+  if(data.length<2)return<div className="chart-readout">No price history available</div>;
+  const W=340,H=70,ps=data.map(d=>d.p),lo=Math.max(0,Math.min(...ps)-0.03),hi=Math.min(1,Math.max(...ps)+0.03);
+  const x=i=>i/(data.length-1)*W,y=v=>H-4-(v-lo)/(hi-lo||1)*(H-8);
+  const pts=data.map((d,i)=>`${x(i).toFixed(1)},${y(d.p).toFixed(1)}`).join(' ');
+  const i=hov??data.length-1,d=data[i],first=data[0].p,last=data[data.length-1].p;
+  return(<div style={{marginTop:12}}>
+    <div className="spark-hd"><span>Yes price · 7 days <span style={{color:last>=first?'var(--green)':'var(--red)'}}>{fmtChg(last-first)} pts</span></span><span className="mono">{new Date(d.t).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric'})} · {fmtCents(d.p)}</span></div>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{display:'block'}} onMouseLeave={()=>setHov(null)}
+      onMouseMove={e=>{const r=e.currentTarget.getBoundingClientRect();setHov(Math.max(0,Math.min(data.length-1,Math.round((e.clientX-r.left)/r.width*(data.length-1)))))}}>
+      <line x1="0" x2={W} y1={y(0.5)} y2={y(0.5)} stroke="rgba(148,163,184,0.18)" strokeDasharray="3 3"/>
+      <polyline points={`0,${H} ${pts} ${W},${H}`} fill="rgba(147,197,253,0.08)" stroke="none"/>
+      <polyline points={pts} fill="none" stroke="#93c5fd" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+      {hov!=null&&<line x1={x(i)} x2={x(i)} y1="0" y2={H} stroke="rgba(226,232,240,0.4)"/>}
+      <circle cx={x(i)} cy={y(d.p)} r="4" fill="#93c5fd" stroke="#0f172a" strokeWidth="2"/>
+    </svg>
+  </div>);
+}
+
 function PizzaPanel({pizza,history}){
   if(!pizza)return<div className="news-loading">Loading pizza intel…</div>;
   const dc=doughconFor(pizza.index);const D=DOUGHCON[dc];
@@ -485,7 +616,7 @@ function App(){
 const globeEl=useRef();
 const globeWrap=useRef();
 const[gsize,setGsize]=useState({w:0,h:0});
-const[markets,setMarkets]=useState(MARKETS);
+const[markets,setMarkets]=useState(()=>MARKETS.map(m=>({...m,links:getLocs(m.question).filter(l=>l.country!==m.country)})));
 const[news,setNews]=useState([]);
 const[newsSource,setNewsSource]=useState('loading');
 const[newsLoading,setNewsLoading]=useState(true);
@@ -501,6 +632,12 @@ const[lastUpd,setLastUpd]=useState(new Date());
 const[newsLastUpd,setNewsLastUpd]=useState(null);
 const[pizza,setPizza]=useState(null);
 const[pizzaHist,setPizzaHist]=useState(null);
+const[trades,setTrades]=useState([]);
+const[tradesLive,setTradesLive]=useState(null);
+const[whaleOnly,setWhaleOnly]=useState(false);
+const[pulses,setPulses]=useState([]);
+const[history,setHistory]=useState(null);
+const marketsRef=useRef(markets);marketsRef.current=markets;
 
 useEffect(()=>{
 const load=async()=>{const{snap,history}=await fetchPizza();setPizza(snap);if(history)setPizzaHist(history)};
@@ -521,11 +658,44 @@ return()=>clearInterval(i);
 },[]);
 
 useEffect(()=>{
-const loadPoly=async()=>{try{const p=await fetchPoly();if(p.length>5){setMarkets(p);setActivities(genActs(p));setDataSource('live');setLastUpd(new Date())}}catch(x){}};
+const loadPoly=async()=>{try{const p=await fetchPoly();if(p.length>5){setMarkets(p);setActivities(genActs(p));setDataSource('live');setLastUpd(new Date());setSelected(s=>s&&(p.find(m=>m.id===s.id)||s))}}catch(x){console.log('Polymarket error:',x.message)}};
 loadPoly();const i=setInterval(loadPoly,300000);
 fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson').then(r=>r.json()).then(d=>setCountries(d)).catch(()=>{});
 return()=>clearInterval(i);
 },[]);
+
+// Real trades: poll the Data API, pulse the globe where they land, arc in the whales
+useEffect(()=>{
+const seen=new Set();let first=true;
+const load=async()=>{
+try{
+const ts=await fetchTrades();setTradesLive(true);
+const fresh=ts.filter(t=>!seen.has(t.id));fresh.forEach(t=>seen.add(t.id));
+if(fresh.length)setTrades(prev=>[...fresh,...prev].sort((a,b)=>b.time-a.time).slice(0,150));
+if(!first){
+const byCond=new Map(marketsRef.current.map(m=>[m.conditionId,m]));const now=Date.now();
+const hits=fresh.map(t=>({t,m:byCond.get(t.conditionId)})).filter(x=>x.m).slice(0,20);
+if(hits.length)setPulses(ps=>[...ps.filter(p=>p.until>now),...hits.map(({t,m})=>({id:t.id,lat:m.lat,lng:m.lng,whale:t.usd>=WHALE_USD,side:t.side,until:now+(t.usd>=WHALE_USD?12000:5000)}))]);
+}
+first=false;
+}catch(e){setTradesLive(v=>v===null?false:v);console.log('Trades error:',e.message)}
+};
+load();const i=setInterval(load,15000);
+const gc=setInterval(()=>setPulses(ps=>ps.length&&ps.some(p=>p.until<=Date.now())?ps.filter(p=>p.until>Date.now()):ps),2000);
+return()=>{clearInterval(i);clearInterval(gc)};
+},[]);
+
+// Live prices for the busiest 100 markets over the CLOB WebSocket
+const streamTokens=useMemo(()=>markets.filter(m=>m.tokenYes).slice(0,100).map(m=>m.tokenYes),[markets]);
+const wsStatus=useLivePrices(streamTokens,upd=>{
+const now=Date.now();
+const apply=m=>{const u=m.tokenYes&&upd[m.tokenYes];if(!u)return m;const bid=u.bid??m.bid,ask=u.ask??m.ask,last=u.last??m.last??m.probability;const p=displayPrice(bid,ask,last);
+return Math.abs(p-m.probability)<0.0005?{...m,bid,ask,last}:{...m,bid,ask,last,probability:p,change24:(m.change24||0)+(p-m.probability),flash:p>m.probability?'up':'down',flashAt:now}};
+setMarkets(ms=>ms.map(apply));setSelected(s=>s&&apply(s));
+});
+
+// Price history for the selected market
+useEffect(()=>{setHistory(null);if(!selected?.tokenYes)return;let off=false;fetchHistory(selected.tokenYes).then(h=>{if(!off)setHistory(h)}).catch(()=>{if(!off)setHistory([])});return()=>{off=true}},[selected?.tokenYes]);
 
 useEffect(()=>{if(markets.length===0)return;const i=setInterval(()=>{const c=markets.filter(m=>m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);setTimeout(()=>setHighlighted(null),4000)}},9000);return()=>clearInterval(i)},[markets]);
 
@@ -539,12 +709,16 @@ useEffect(()=>{if(!globeEl.current)return;if(selected){globeEl.current.controls(
 const filtered=useMemo(()=>markets.filter(m=>{if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,catFilter]);
 const stats=useMemo(()=>({total:markets.length,volume:markets.reduce((s,m)=>s+m.volume,0)}),[markets]);
 const neh=useMemo(()=>nehIndex(markets),[markets]);
+const nehPrev=useMemo(()=>nehIndex(markets.map(m=>({...m,probability:Math.min(1,Math.max(0,m.probability-(m.change24||0)))}))).score,[markets]);
+const movers=useMemo(()=>[...markets].filter(m=>m.change24).sort((a,b)=>Math.abs(b.change24)-Math.abs(a.change24)).slice(0,5),[markets]);
+const whales=useMemo(()=>trades.filter(t=>t.usd>=WHALE_USD).slice(0,5),[trades]);
+const flowArcs=useMemo(()=>pulses.filter(p=>p.whale).map(p=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:p.lat,endLng:p.lng,color:p.side==='SELL'?['rgba(239,68,68,0.1)','rgba(239,68,68,0.95)']:['rgba(34,197,94,0.1)','rgba(34,197,94,0.95)'],stroke:1.4,dashLength:1,dashGap:0,dashAnimateTime:0,altitude:0.35})),[pulses]);
 const nl=nehLabel(neh.score);
 const dc=pizza?doughconFor(pizza.index):5;
-const arcs=useMemo(()=>genArcs(filtered),[filtered]);
-const rings=useMemo(()=>genRings(filtered,highlighted,dc),[filtered,highlighted,dc]);
+const arcs=useMemo(()=>genArcs(filtered,flowArcs),[filtered,flowArcs]);
+const rings=useMemo(()=>[...genRings(filtered,highlighted,dc),...pulses.map(p=>({lat:p.lat,lng:p.lng,maxR:p.whale?6:2.5,propagationSpeed:p.whale?4:3,repeatPeriod:p.whale?500:900,color:p.side==='SELL'?'#ef4444':'#22c55e'}))],[filtered,highlighted,dc,pulses]);
 const shopPoints=useMemo(()=>(pizza?.shops||[]).map(s=>({...s,isShop:true})),[pizza]);
-const ticker=useMemo(()=>{const head=[`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`,`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`];if(news.length===0)return[...head,'Loading live news...',...head,'Loading live news...'];const t=[...head,...news.slice(0,15).map(n=>(n.isBreaking?'🔴 ':'')+n.source+': '+n.title)];return[...t,...t]},[news,dc,neh.score]);
+const ticker=useMemo(()=>{const head=[`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`,`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`,...movers.slice(0,3).map(m=>`${m.change24>0?'📈':'📉'} ${m.question} ${fmtProb(m.probability)} (${fmtChg(m.change24)} 24h)`),...whales.slice(0,2).map(t=>`🐋 ${fmtVol(t.usd)} ${t.side} ${t.outcome} — ${t.title}`)];if(news.length===0)return[...head,'Loading live news...',...head,'Loading live news...'];const t=[...head,...news.slice(0,15).map(n=>(n.isBreaking?'🔴 ':'')+n.source+': '+n.title)];return[...t,...t]},[news,dc,neh.score,movers,whales]);
 const cats=['All','Conflict','Trump','Politics','Economy','Trade'];
 
 return(
@@ -555,6 +729,7 @@ return(
 <div className="dc-pill" style={{color:DOUGHCON[dc].color,borderColor:DOUGHCON[dc].color+'88',background:DOUGHCON[dc].color+'14'}}>🍕 DOUGHCON {dc}</div>
 <div className="stat"><div className="stat-val mono" style={{color:nl.c}}>{neh.score}</div><div className="stat-lbl">NEH Index</div></div>
 <div className="stat"><div className="stat-val">{stats.total}</div><div className="stat-lbl">Markets</div></div>
+<div className="stat"><div className="stat-val" style={{display:'flex',alignItems:'center',gap:6,justifyContent:'center',color:wsStatus==='live'?'var(--green)':'var(--muted)'}}><span className="dot" style={{background:wsStatus==='live'?'var(--green)':'var(--faint)',animation:wsStatus==='live'?undefined:'none'}}></span>{wsStatus==='live'?'LIVE':wsStatus==='connecting'?'…':'OFF'}</div><div className="stat-lbl">Price stream</div></div>
 <div className="stat"><div className="stat-val">{fmtVol(stats.volume)}</div><div className="stat-lbl">Volume</div></div>
 <Clock/>
 </div>
@@ -567,11 +742,11 @@ return(
 </aside>
 
 <main className="globe" ref={globeWrap}>
-<div className={`badge-api ${dataSource==='live'?'':'sample'}`}><span className="dot" style={{width:6,height:6,background:dataSource==='live'?'var(--green)':'var(--yellow)'}}></span>{dataSource==='live'?'Live Polymarket':'Sample markets'} · {fmtTime(lastUpd)}</div>
+<div className={`badge-api ${dataSource==='live'?'':'sample'}`}><span className="dot" style={{width:6,height:6,background:dataSource==='live'?'var(--green)':'var(--yellow)'}}></span>{dataSource==='live'?'Live Polymarket':'Sample markets'} · {fmtTime(lastUpd)}{wsStatus==='live'?' · streaming':''}</div>
 
 <div className="neh">
 <div className="dc-kicker">NOTHING EVER HAPPENS INDEX</div>
-<div className="neh-row"><span className="neh-score mono" style={{color:nl.c}}>{neh.score}</span><span className="neh-label" style={{color:nl.c}}>{nl.t}</span></div>
+<div className="neh-row"><span><span className="neh-score mono" style={{color:nl.c}}>{neh.score}</span>{neh.score!==nehPrev&&<span className="mono" style={{fontSize:11,marginLeft:6,color:'var(--muted)'}}>{neh.score>nehPrev?'▲':'▼'}{Math.abs(neh.score-nehPrev)} 24h</span>}</span><span className="neh-label" style={{color:nl.c}}>{nl.t}</span></div>
 <div className="meter" role="meter" aria-valuenow={neh.score} aria-valuemin="0" aria-valuemax="100"><div className="meter-mark" style={{left:neh.score+'%'}}></div></div>
 <div className="dc-legend"><span>Nothing happens</span><span>It's happening</span></div>
 <div className="neh-drivers">{neh.drivers.map(m=><div key={m.id} className="neh-drv" onClick={()=>setSelected(m)}><span>{m.question}</span><span className="mono">{fmtProb(m.probability)}</span></div>)}</div>
@@ -590,8 +765,13 @@ return(
 <div className="detail-stats">
 <div className="detail-stat"><div className="detail-val" style={{color:selected.probability>=0.6?'var(--green)':selected.probability<=0.4?'var(--red)':'var(--yellow)'}}>{fmtProb(selected.probability)}</div><div className="detail-lbl">Yes</div></div>
 <div className="detail-stat"><div className="detail-val">{fmtVol(selected.volume)}</div><div className="detail-lbl">Volume</div></div>
+{selected.change24?<div className="detail-stat"><div className="detail-val mono" style={{color:selected.change24>0?'var(--green)':'var(--red)'}}>{fmtChg(selected.change24)}</div><div className="detail-lbl">24h pts</div></div>:null}
+{selected.vol24?<div className="detail-stat"><div className="detail-val">{fmtVol(selected.vol24)}</div><div className="detail-lbl">24h Vol</div></div>:null}
 <div className="detail-stat"><div className="detail-val">{selected.country}</div><div className="detail-lbl">Location</div></div>
 </div>
+{(selected.bid>0||selected.liquidity>0)&&<div className="shop-meta" style={{marginTop:8}}>{selected.bid>0&&<>Bid {fmtCents(selected.bid)} · Ask {fmtCents(selected.ask)} · </>}{selected.liquidity>0&&<>Liquidity {fmtVol(selected.liquidity)}</>}{selected.endDate&&<> · Ends {new Date(selected.endDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</>}</div>}
+{selected.links?.length>0&&<div className="shop-meta" style={{marginTop:4}}>Connects {selected.country} ↔ {selected.links.map(l=>l.country).join(', ')}</div>}
+{selected.tokenYes&&<PriceChart data={history&&(history.length?[...history,{t:Date.now(),p:selected.probability}]:history)}/>}
 {selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on Polymarket →</a>}
 </div>)}
 
@@ -613,7 +793,7 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}
 <div className="act-tabs">
 <button className={`act-tab ${tab==='news'?'active':''}`} onClick={()=>setTab('news')}>📰 Intel Feed</button>
 <button className={`act-tab ${tab==='markets'?'active':''}`} onClick={()=>setTab('markets')}>📊 Markets</button>
-<button className={`act-tab ${tab==='activity'?'active':''}`} onClick={()=>setTab('activity')}>🔴 Flow</button>
+<button className={`act-tab ${tab==='activity'?'active':''}`} onClick={()=>setTab('activity')}>🔴 Flow{tradesLive&&whales.length>0&&<span className="badge" style={{marginLeft:4,background:'var(--yellow)',color:'#0a0f1a'}}>{whales.length}</span>}</button>
 </div>
 <div className="scroll">
 {tab==='news'&&(<>
@@ -634,18 +814,27 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}
 <div key={m.id} className={`card ${selected?.id===m.id?'sel':''}`} onClick={()=>setSelected(m)}>
 <div className="src">{m.source==='polymarket'?'◆ Polymarket':'◇ Manifold'} · {m.category}</div>
 <div className="q">{m.question}</div>
-<div className="row"><span className={`prob ${m.probability>=0.7?'hi':m.probability>=0.4?'md':'lo'}`}>{fmtProb(m.probability)}</span><span className="vol">{fmtVol(m.volume)}</span></div>
+<div className="row"><span><span key={m.flashAt||0} className={`prob ${m.probability>=0.7?'hi':m.probability>=0.4?'md':'lo'} ${m.flash&&Date.now()-m.flashAt<3000?'flash-'+m.flash:''}`}>{fmtProb(m.probability)}</span>{m.change24?<span className="mono" style={{fontSize:10,marginLeft:6,color:m.change24>0?'var(--green)':'var(--red)'}}>{fmtChg(m.change24)}</span>:null}</span><span className="vol">{m.vol24?fmtVol(m.vol24)+' 24h · ':''}{fmtVol(m.volume)}</span></div>
 </div>))}
 </>)}
-{tab==='activity'&&(<>
-<div className="note" style={{paddingTop:0}}>⚠ Simulated order flow for illustration — not real trades.</div>
+{tab==='activity'&&(tradesLive?(<>
+<div className="tabs"><button className={`tab ${!whaleOnly?'active':''}`} onClick={()=>setWhaleOnly(false)}>All ≥ $100</button><button className={`tab ${whaleOnly?'active':''}`} onClick={()=>setWhaleOnly(true)}>🐋 Whales ≥ {fmtVol(WHALE_USD)}</button></div>
+<div className="note" style={{paddingTop:0}}>Live fills from the Polymarket Data API · refreshes every 15s</div>
+{trades.filter(t=>!whaleOnly||t.usd>=WHALE_USD).slice(0,60).map(t=>{const m=markets.find(x=>x.conditionId===t.conditionId);return(
+<div key={t.id} className={`act ${t.usd>=WHALE_USD?'whale':''}`} style={{cursor:m||t.url?'pointer':'default'}} onClick={()=>m?setSelected(m):t.url&&window.open(t.url,'_blank','noopener')}>
+<span>{t.usd>=WHALE_USD?'🐋':t.side==='BUY'?'📈':'📉'}</span>
+<div className="act-content"><div className="act-title">{t.title}</div><div className="act-meta"><span className={`act-amt ${t.side==='SELL'?'sell':'buy'}`}>{t.side} {t.outcome} @ {fmtCents(t.price)}</span> · {fmtVol(t.usd)} · {t.who}{m&&' · 🌐'}</div></div>
+<span className="act-time">{fmtTime(t.time)}</span>
+</div>)})}
+</>):(<>
+<div className="note" style={{paddingTop:0}}>{tradesLive===null?'⏳ Connecting to Polymarket trades…':'⚠ Polymarket trade feed unreachable — showing simulated flow for illustration, not real trades.'}</div>
 {activities.map(a=>(
 <div key={a.id} className={`act ${a.isWhale?'whale':''}`}>
 <span>{a.isWhale?'🐋':a.action==='BUY'?'📈':'📉'}</span>
 <div className="act-content"><div className="act-title">{a.market}</div><div className="act-meta"><span className={`act-amt ${a.action.toLowerCase()}`}>{a.action} ${a.amount.toLocaleString()}</span> • {a.source}</div></div>
 <span className="act-time">{fmtTime(a.time)}</span>
 </div>))}
-</>)}
+</>))}
 </div>
 </aside>
 
