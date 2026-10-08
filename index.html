@@ -523,6 +523,47 @@ function genRings(ms,hl,dc){const rs=ms.filter(m=>m.volume>2e6&&m.lat).slice(0,1
 function genActs(ms){const a=[];const amts=[500,1000,2500,5000,10000,25000];for(let i=0;i<14;i++){const m=ms[Math.floor(Math.random()*Math.min(ms.length,15))];if(!m)continue;const amt=amts[Math.floor(Math.random()*amts.length)];a.push({id:'a-'+i,market:m.question,action:Math.random()<0.5?'BUY':'SELL',amount:amt,isWhale:amt>=10000,time:new Date(Date.now()-Math.random()*300000),source:m.source})}return a.sort((x,y)=>y.time-x.time)}
 
 // ============ COMPONENTS ============
+// Catches a crash in one part of the page, shows the error there, and keeps the rest running
+// The 3D globe needs WebGL; Brave/Chrome without graphics acceleration can't create a context
+const HAS_WEBGL=(()=>{try{const c=document.createElement('canvas');return!!(window.WebGLRenderingContext&&(c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl')))}catch(e){return false}})();
+
+// 2D fallback: equirectangular map with the same markets
+function FlatMap({w,h,countries,points,arcs,selected,onSelect,dcColor}){
+  const[hov,setHov]=useState(null);
+  const W=Math.max(w,200),H=Math.max(h,150),sc=Math.min(W/360,H/180)*1.0,ox=W/2,oy=H/2;
+  const px=(lng,lat)=>[ox+lng*sc,oy-lat*sc];
+  const rings=g=>g.type==='Polygon'?[g.coordinates]:g.type==='MultiPolygon'?g.coordinates:[];
+  const paths=useMemo(()=>(countries||[]).map((f,i)=>{let d='';rings(f.geometry||{}).forEach(poly=>poly.forEach(r=>{r.forEach(([lng,lat],k)=>{const[x,y]=px(lng,lat);d+=(k?'L':'M')+x.toFixed(1)+','+y.toFixed(1)});d+='Z'}));return<path key={i} d={d} fill="rgba(59,130,246,0.07)" stroke="rgba(100,180,255,0.3)" strokeWidth="0.6"/>}),[countries,W,H]);
+  const[pxP,pyP]=px(PENTAGON.lng,PENTAGON.lat);
+  return(<svg width={W} height={H} style={{display:'block'}}>
+    <rect x={ox-180*sc} y={oy-90*sc} width={360*sc} height={180*sc} fill="#0b1324" rx="6"/>
+    {paths}
+    {arcs.filter(a=>a.endLat!=null).slice(0,40).map((a,i)=>{const[x1,y1]=px(a.startLng,a.startLat),[x2,y2]=px(a.endLng,a.endLat);const mx=(x1+x2)/2,my=(y1+y2)/2-Math.hypot(x2-x1,y2-y1)*0.25;return<path key={i} d={`M${x1},${y1} Q${mx},${my} ${x2},${y2}`} fill="none" stroke={(a.color&&a.color[0])||'rgba(59,130,246,0.6)'} strokeWidth="1.2" opacity="0.7"/>})}
+    {points.map(d=>{const[x,y]=px(d.lng,d.lat);const sel=selected?.id===d.id;return<circle key={d.id} cx={x} cy={y} r={d.isShop?2:sel?7:4+Math.min(d.volume/2e7,4)} fill={d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'} stroke="#0a0f1a" strokeWidth="1.5" style={{cursor:d.isShop?'default':'pointer'}} onMouseEnter={()=>setHov(d)} onMouseLeave={()=>setHov(null)} onClick={()=>!d.isShop&&onSelect(d)}/>})}
+    <circle cx={pxP} cy={pyP} r="5" fill="none" stroke={dcColor} strokeWidth="2"><animate attributeName="r" values="4;14;4" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0;1" dur="2s" repeatCount="indefinite"/></circle>
+    <text x={pxP+8} y={pyP+4} fill={dcColor} fontSize="10" fontWeight="700">PENTAGON</text>
+    {hov&&(()=>{const[x,y]=px(hov.lng,hov.lat);const t=hov.isShop?'🍕 '+hov.name:hov.question+' · '+fmtProb(hov.probability);const tw=Math.min(t.length*6.2+16,300);const tx=Math.min(Math.max(x-tw/2,4),W-tw-4);return<g pointerEvents="none"><rect x={tx} y={y-34} width={tw} height="22" rx="5" fill="rgba(10,15,26,0.95)" stroke="rgba(59,130,246,0.4)"/><text x={tx+8} y={y-19} fill="#f1f5f9" fontSize="11">{t.length>48?t.slice(0,47)+'…':t}</text></g>})()}
+  </svg>);
+}
+
+class Boundary extends React.Component{
+  constructor(p){super(p);this.state={err:null}}
+  static getDerivedStateFromError(err){return{err}}
+  componentDidCatch(err,info){console.error('['+this.props.name+'] crashed:',err,info&&info.componentStack)}
+  render(){
+    if(!this.state.err)return this.props.children;
+    const e=this.state.err;
+    return(<div className={this.props.className} style={{padding:16,overflow:'auto',...(this.props.style||{})}}>
+      <div style={{border:'1px solid rgba(239,68,68,0.5)',background:'rgba(239,68,68,0.08)',borderRadius:10,padding:12,fontSize:12,lineHeight:1.5}}>
+        <div style={{fontWeight:700,color:'#fca5a5',marginBottom:4}}>⚠ {this.props.name} failed to load</div>
+        <div className="mono" style={{color:'#f1f5f9',wordBreak:'break-word'}}>{String(e&&e.message||e)}</div>
+        <div className="mono" style={{color:'#64748b',fontSize:10,marginTop:6,whiteSpace:'pre-wrap',maxHeight:120,overflow:'auto'}}>{String(e&&e.stack||'').split('\n').slice(0,6).join('\n')}</div>
+        <button onClick={()=>this.setState({err:null})} style={{marginTop:8,background:'#3b82f6',color:'white',border:'none',borderRadius:6,padding:'4px 10px',fontSize:11,cursor:'pointer'}}>Retry</button>
+      </div>
+    </div>);
+  }
+}
+
 function Clock(){
   const[now,setNow]=useState(new Date());
   useEffect(()=>{const i=setInterval(()=>setNow(new Date()),1000);return()=>clearInterval(i)},[]);
@@ -732,7 +773,7 @@ const cats=['All','Conflict','Trump','Politics','Economy','Trade'];
 
 return(
 <div className="app">
-<header className="header">
+<Boundary name="Header" className="header"><header className="header">
 <div className="logo"><span className="logo-icon">⚡</span><div><h1>ConnecTHOR</h1><div className="logo-sub">Pentagon Pizza Index · Market Intel</div></div></div>
 <div className="stats">
 <div className="dc-pill" style={{color:DOUGHCON[dc].color,borderColor:DOUGHCON[dc].color+'88',background:DOUGHCON[dc].color+'14'}}>🍕 DOUGHCON {dc}</div>
@@ -743,12 +784,12 @@ return(
 <Clock/>
 </div>
 <input className="search" type="text" placeholder="Search markets..." value={search} onChange={e=>setSearch(e.target.value)}/>
-</header>
+</header></Boundary>
 
-<aside className="left">
+<Boundary name="Pizza panel" className="left"><aside className="left">
 <div className="panel-hd"><span className="panel-title">🍕 Pentagon Pizza Watch</span><span className={`badge ${pizza?.source==='live'?'':'warn'}`}>{pizza?.source==='live'?'LIVE':'MODELED'}</span></div>
 <div className="scroll"><PizzaPanel pizza={pizza} history={pizzaHist}/></div>
-</aside>
+</aside></Boundary>
 
 <main className="globe" ref={globeWrap}>
 <div className={`badge-api ${dataSource==='live'?'':'sample'}`}><span className="dot" style={{width:6,height:6,background:dataSource==='live'?'var(--green)':'var(--yellow)'}}></span>{dataSource==='live'?'Live Polymarket':'Sample markets'} · {fmtTime(lastUpd)}{wsStatus==='live'?' · streaming':''}</div>
@@ -784,7 +825,8 @@ return(
 {selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on Polymarket →</a>}
 </div>)}
 
-{gsize.w>0&&<Globe ref={globeEl} width={gsize.w} height={gsize.h} globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg" bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="https://unpkg.com/three-globe/example/img/night-sky.png"
+<Boundary name="Globe">{gsize.w>0&&!HAS_WEBGL&&<><FlatMap w={gsize.w} h={gsize.h} countries={countries.features} points={[...filtered,...shopPoints]} arcs={arcs} selected={selected} onSelect={setSelected} dcColor={DOUGHCON[dc].color}/><div className="note" style={{position:'absolute',left:12,bottom:4,right:12,zIndex:40,color:'#94a3b8'}}>2D view: your browser has WebGL turned off, so the 3D globe can't run. In Brave, enable <b>Settings → System → Use graphics acceleration when available</b> and restart the browser.</div></>}
+{gsize.w>0&&HAS_WEBGL&&<Globe ref={globeEl} width={gsize.w} height={gsize.h} globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg" bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="https://unpkg.com/three-globe/example/img/night-sky.png"
 polygonsData={countries.features||[]} polygonCapColor={()=>'rgba(0,0,0,0)'} polygonSideColor={()=>'rgba(100,150,200,0.05)'} polygonStrokeColor={()=>'rgba(100,180,255,0.25)'} polygonAltitude={0.005}
 pointsData={[...filtered,...shopPoints]} pointLat="lat" pointLng="lng"
 pointAltitude={d=>d.isShop?0.01+(d.ratio||0)*0.02:Math.min(0.05+d.volume/50000000,0.18)}
@@ -795,10 +837,10 @@ onPointClick={d=>{if(!d.isShop)setSelected(d)}}
 labelsData={[{lat:PENTAGON.lat,lng:PENTAGON.lng,text:'PENTAGON'}]} labelLat="lat" labelLng="lng" labelText="text" labelSize={0.6} labelDotRadius={0.25} labelColor={()=>DOUGHCON[dc].color} labelResolution={2}
 arcsData={arcs} arcStartLat="startLat" arcStartLng="startLng" arcEndLat="endLat" arcEndLng="endLng" arcColor="color" arcAltitude="altitude" arcStroke="stroke" arcDashLength="dashLength" arcDashGap="dashGap" arcDashAnimateTime="dashAnimateTime"
 ringsData={rings} ringLat="lat" ringLng="lng" ringMaxRadius="maxR" ringPropagationSpeed="propagationSpeed" ringRepeatPeriod="repeatPeriod" ringColor={d=>t=>{const c=d.color;return c.startsWith('#')?c+Math.round((1-t)*200).toString(16).padStart(2,'0'):c}}
-atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}
+atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
 </main>
 
-<aside className="right">
+<Boundary name="Right panel" className="right"><aside className="right">
 <div className="act-tabs">
 <button className={`act-tab ${tab==='news'?'active':''}`} onClick={()=>setTab('news')}>📰 Intel Feed</button>
 <button className={`act-tab ${tab==='markets'?'active':''}`} onClick={()=>setTab('markets')}>📊 Markets</button>
@@ -845,18 +887,18 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}
 </div>))}
 </>))}
 </div>
-</aside>
+</aside></Boundary>
 
-<div className="ticker">
+<Boundary name="Ticker" className="ticker"><div className="ticker">
 <span className="ticker-lbl"><span className="livedot"></span>BREAKING</span>
 <div className="ticker-scroll">{ticker.map((t,i)=><span key={i} className="ticker-item">{t}</span>)}</div>
-</div>
+</div></Boundary>
 </div>
 );
 }
 
 window.__booted=true;
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+ReactDOM.createRoot(document.getElementById('root')).render(<Boundary name="ConnecTHOR" style={{maxWidth:640,margin:'40px auto'}}><App/></Boundary>);
 </script>
 </body>
 </html>
