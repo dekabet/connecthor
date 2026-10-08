@@ -11,6 +11,9 @@ Pentagon Pizza Index + geopolitical prediction-market intel on a 3D globe, in a 
 - **Intel Feed** - live world news (BBC, NYT, Al Jazeera, NPR, Guardian via RSS) tagged MILITARY / DIPLOMACY / ECONOMY, plus a breaking ticker
 - **Markets tab** - live Polymarket odds streamed in real time, 24h change and volume
 - **Flow tab** - real Polymarket trades with a whale filter; whale trades arc across the globe
+- **Hotspots tab** - countries ranked by escalation odds × money at stake, with the top market for each; top hotspots are labelled on the globe
+- **Linked intel** - headlines that mention a country link to that country's busiest market
+- **Calm motion** - slow auto-rotate and spotlight, smooth in-place updates, a ticker that only refreshes between loops; honours the OS "reduce motion" setting
 
 ### About the pizza data
 
@@ -134,6 +137,7 @@ const getColor = (market) => {
 ```
 polyglobe/
 ├── index.html      # Complete standalone app
+├── favicon.svg     # Site icon
 └── README.md       # This file
 ```
 

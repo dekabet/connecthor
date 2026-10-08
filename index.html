@@ -4,6 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ConnecTHOR — Pizza Index & Market Intel</title>
+  <meta name="description" content="Pentagon Pizza Index, DOUGHCON level and live geopolitical prediction markets (Polymarket, Kalshi, Manifold, PredictIt) on a 3D globe.">
+  <meta name="theme-color" content="#0a0f1a">
+  <meta property="og:title" content="ConnecTHOR — Pizza Index & Market Intel">
+  <meta property="og:description" content="Pentagon Pizza Index, DOUGHCON level and live geopolitical prediction markets on a 3D globe.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/react-globe.gl@2.27.2"></script>
@@ -145,12 +150,30 @@
     .ticker{grid-area:t;background:linear-gradient(90deg,rgba(220,38,38,0.15),rgba(239,68,68,0.1));border-top:1px solid rgba(239,68,68,0.3);padding:8px 0;overflow:hidden;display:flex;align-items:center}
     .ticker-lbl{position:relative;z-index:2;box-shadow:12px 0 12px rgba(10,15,26,0.9);background:var(--red);color:white;padding:4px 12px;font-size:10px;font-weight:700;margin-right:16px;flex-shrink:0;display:flex;align-items:center;gap:6px}
     .ticker-lbl .livedot{width:6px;height:6px;background:white;border-radius:50%;animation:pulse 1s infinite}
-    .ticker-scroll{display:flex;animation:scroll 90s linear infinite;white-space:nowrap}
+    .ticker-scroll{display:flex;animation:scroll 120s linear infinite;white-space:nowrap;will-change:transform}
     .ticker-scroll:hover{animation-play-state:paused}
     @keyframes scroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
     .ticker-item{padding:0 40px;font-size:12px}
     .ticker-item::after{content:'•';margin-left:40px;color:var(--red)}
     .loading{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg)}
+    @keyframes fadeUp{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
+    @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+    .app{animation:fadeIn .6s ease-out}
+    .spotlight,.detail{animation:fadeUp .45s cubic-bezier(.2,.8,.2,1)}
+    .dc-pill{transition:color .8s,border-color .8s,background .8s}
+    .tab-fade{animation:fadeIn .25s ease-out}
+    .hot{display:block;padding:10px;border-radius:8px;margin-bottom:6px;background:var(--card2);border:1px solid var(--border);cursor:pointer}
+    .hot:hover{border-color:var(--blue)}
+    .hot-hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+    .hot-name{font-size:13px;font-weight:700}
+    .hot-bar{height:4px;border-radius:2px;background:var(--track);margin:6px 0 4px;overflow:hidden}
+    .hot-bar span{display:block;height:100%;border-radius:2px;transition:width .8s}
+    .news-rel{display:block;font-size:10px;color:var(--muted);margin-top:5px;cursor:pointer}
+    .news-rel:hover{color:var(--blue)}
+    .info{cursor:help;color:var(--faint);font-size:10px;margin-left:4px}
+    .ticker-item a,.ticker-item .lnk{color:inherit;text-decoration:none;cursor:pointer}
+    .ticker-item a:hover,.ticker-item .lnk:hover{color:var(--blue)}
+    @media(prefers-reduced-motion:reduce){.dot,.spot-dot,.livedot{animation:none!important}.app,.spotlight,.detail{animation:none}}
     ::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 
     @media(max-width:1100px){
@@ -416,7 +439,7 @@ function getLocs(q){
   hits.sort((a,b)=>a.i-b.i);const seen=new Set();
   return hits.filter(h=>!seen.has(h.c)&&seen.add(h.c)).map(h=>({lat:h.lat,lng:h.lng,country:h.c}));
 }
-function getLoc(q){const ls=getLocs(q);if(!ls.length)return null;const j=hash(q),k=hash(q+'#');return{lat:ls[0].lat+(j-0.5)*1.5,lng:ls[0].lng+(k-0.5)*1.5,country:ls[0].country,links:ls.slice(1)}}
+function getLoc(q){const ls=getLocs(q);if(!ls.length)return null;const j=hash(q),k=hash(q+'#');return{lat:ls[0].lat+(j-0.5)*1.5,lng:ls[0].lng+(k-0.5)*1.5,cLat:ls[0].lat,cLng:ls[0].lng,country:ls[0].country,links:ls.slice(1)}}
 function getCat(q){const l=q.toLowerCase();if(CONFLICT_RE.test(l))return'Conflict';if(l.includes('trump'))return'Trump';if(l.includes('bitcoin')||l.includes('recession')||l.includes('fed ')||l.includes('rate'))return'Economy';if(l.includes('tariff'))return'Trade';return'Politics'}
 const fmtProb=p=>Math.round(p*100)+'%';
 const fmtVol=v=>v>=1e6?'$'+(v/1e6).toFixed(1)+'M':v>=1e3?'$'+(v/1e3).toFixed(0)+'K':'$'+Math.round(v);
@@ -466,7 +489,7 @@ async function fetchHistory(token){
 function useLivePrices(tokens,onPrices){
   const[status,setStatus]=useState('off');
   const cb=useRef(onPrices);cb.current=onPrices;
-  const key=tokens.join(',');
+  const key=[...tokens].sort().join(',');
   useEffect(()=>{
     if(!tokens.length||typeof WebSocket==='undefined')return;
     let ws,ping,flush,retry,dead=false,attempt=0;const book={},dirty=new Set();
@@ -592,13 +615,39 @@ const ARC_COLORS={Conflict:['rgba(249,115,22,0.8)','rgba(239,68,68,0.25)'],Trump
 function genArcs(ms,flows){
   const out=[],seen=new Set();
   ms.forEach(m=>(m.links||[]).forEach(l=>{const k=[m.country,l.country].sort().join('|');if(seen.has(k)||out.length>=40)return;seen.add(k);
-    out.push({startLat:m.lat,startLng:m.lng,endLat:l.lat,endLng:l.lng,color:ARC_COLORS[m.category]||['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.5+Math.min(m.vol24/2e6,1),dashLength:0.4,dashGap:0.25,dashAnimateTime:7000+out.length*373%3000,altitude:null})}));
+    out.push({startLat:m.lat,startLng:m.lng,endLat:l.lat,endLng:l.lng,color:ARC_COLORS[m.category]||['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.5+Math.min(m.vol24/2e6,1),dashLength:0.4,dashGap:0.25,dashAnimateTime:7000+out.length*373%3000,initGap:hash(k),altitude:null})}));
   genArcsDC(ms.filter(m=>m.country!=='USA'&&!(m.links||[]).some(l=>l.country==='USA'))).forEach(a=>out.push(a));
   return out.concat(flows||[]);
 }
-function genArcsDC(ms){return ms.filter(m=>isUSD(m)&&m.volume>1e6&&m.lat).slice(0,6).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.4,dashLength:0.3,dashGap:0.3,dashAnimateTime:9000+i*700,altitude:0.1+(i%3)*0.05}))}
+function genArcsDC(ms){return ms.filter(m=>isUSD(m)&&m.volume>1e6&&m.lat).slice(0,6).map((m,i)=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:m.lat,endLng:m.lng,color:m.category==='Conflict'?['rgba(249,115,22,0.75)','rgba(249,115,22,0.15)']:m.category==='Trump'?['rgba(239,68,68,0.7)','rgba(239,68,68,0.15)']:['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.4,dashLength:0.3,dashGap:0.3,dashAnimateTime:9000+i*700,initGap:hash(m.id+'dc'),altitude:0.1+(i%3)*0.05}))}
 function genRings(ms,dc){const rs=ms.filter(m=>isUSD(m)&&m.volume>2e6&&m.lat).slice(0,12).map((m,i)=>({lat:m.lat,lng:m.lng,maxR:2,propagationSpeed:0.6,repeatPeriod:3500+i*400,color:tensionOf(m)>0.5&&m.category==='Conflict'?'rgba(239,68,68,0.45)':'rgba(59,130,246,0.35)'}));rs.push({lat:PENTAGON.lat,lng:PENTAGON.lng,maxR:2+(5-dc)*1.2,propagationSpeed:0.7+(5-dc)*0.35,repeatPeriod:Math.max(900,2800-(5-dc)*450),color:DOUGHCON[dc].color});return rs}
 function genActs(ms){const a=[];const amts=[500,1000,2500,5000,10000,25000];for(let i=0;i<14;i++){const m=ms[Math.floor(Math.random()*Math.min(ms.length,15))];if(!m)continue;const amt=amts[Math.floor(Math.random()*amts.length)];a.push({id:'a-'+i,market:m.question,action:Math.random()<0.5?'BUY':'SELL',amount:amt,isWhale:amt>=10000,time:new Date(Date.now()-Math.random()*300000),source:m.source})}return a.sort((x,y)=>y.time-x.time)}
+
+// Countries ranked by escalation odds × money at stake (real-money venues only)
+function hotspots(ms){
+  const by=new Map();
+  ms.filter(isUSD).forEach(m=>{const k=m.country;if(!k)return;const h=by.get(k)||{country:k,lat:m.cLat??m.lat,lng:m.cLng??m.lng,n:0,vol24:0,volume:0,tw:0,ts:0,top:null};
+    h.n++;h.vol24+=m.vol24||0;h.volume+=m.volume||0;
+    if(m.category==='Conflict'||CONFLICT_RE.test(m.question)){const w=Math.sqrt(Math.max(m.volume,1e4));h.tw+=w;h.ts+=w*tensionOf(m)}
+    if(!h.top||(m.vol24||m.volume/30)>(h.top.vol24||h.top.volume/30))h.top=m;by.set(k,h)});
+  return[...by.values()].map(h=>({...h,tension:h.tw?h.ts/h.tw:null,heat:(h.tw?h.ts/h.tw:0.12)*Math.log10(10+h.vol24+h.volume/30)})).sort((a,b)=>b.heat-a.heat);
+}
+const daysLeft=d=>{const t=new Date(d).getTime();if(!isFinite(t))return null;return Math.ceil((t-Date.now())/864e5)};
+const fmtLeft=d=>{const n=daysLeft(d);return n==null?'':n<0?'closed':n===0?'ends today':n===1?'ends tomorrow':n<60?`ends in ${n} days`:`ends ${new Date(d).toLocaleDateString('en-GB',{month:'short',year:'numeric'})}`};
+const REDUCED_MOTION=typeof matchMedia!=='undefined'&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Bottom ticker: content only changes between loops (so it never jumps), at a steady reading speed
+const TICKER_PX_PER_S=REDUCED_MOTION?18:30;
+function Ticker({items}){
+  const[shown,setShown]=useState(items);const latest=useRef(items);latest.current=items;
+  const ref=useRef(null);const[dur,setDur]=useState(120);
+  useEffect(()=>{if(shown.placeholder&&!items.placeholder)setShown(items)},[items]);
+  React.useLayoutEffect(()=>{const w=ref.current?ref.current.scrollWidth/2:0;if(w)setDur(Math.max(30,w/TICKER_PX_PER_S))},[shown]);
+  const row=[...shown,...shown];
+  return(<div ref={ref} className="ticker-scroll" style={{animationDuration:dur+'s'}} onAnimationIteration={()=>setShown(latest.current)}>
+    {row.map((t,i)=><span key={i} className="ticker-item">{t.href?<a href={t.href} target="_blank" rel="noopener noreferrer">{t.text}</a>:t.onClick?<span className="lnk" onClick={t.onClick}>{t.text}</span>:t.text}</span>)}
+  </div>);
+}
 
 // ============ COMPONENTS ============
 // Catches a crash in one part of the page, shows the error there, and keeps the rest running
@@ -717,7 +766,7 @@ function PriceChart({data}){
 function PizzaPanel({pizza,history}){
   if(!pizza)return<div className="news-loading">Loading pizza intel…</div>;
   const dc=doughconFor(pizza.index);const D=DOUGHCON[dc];
-  const shops=[...pizza.shops].sort((a,b)=>(b.ratio??-1)-(a.ratio??-1));
+  const shops=[...pizza.shops].sort((a,b)=>a.dist-b.dist); // fixed order, nearest first, so cards don't reshuffle
   return(<>
     <div className="dc-box" style={{borderColor:D.color+'66'}}>
       <div className="dc-top">
@@ -768,14 +817,17 @@ const[history,setHistory]=useState(null);
 const[venues,setVenues]=useState({});
 const[srcFilter,setSrcFilter]=useState('all');
 const marketsRef=useRef(markets);marketsRef.current=markets;
+const pizzaRef=useRef(null);pizzaRef.current=pizza;
+const newsRef=useRef(0);newsRef.current=news.length;
 
 useEffect(()=>{
-const load=async()=>{const{snap,history}=await fetchPizza();setPizza(snap);if(history)setPizzaHist(history)};
+const load=async()=>{if(document.hidden&&pizzaRef.current)return;const{snap,history}=await fetchPizza();setPizza(snap);if(history)setPizzaHist(history)};
 load();const i=setInterval(load,60000);return()=>clearInterval(i);
 },[]);
 
 useEffect(()=>{
 const loadNews=async()=>{
+if(document.hidden&&newsRef.current)return;
 try{
 const result=await fetchNews();
 if(result&&result.items.length>0){setNews(result.items);setNewsSource(result.source);setNewsLastUpd(new Date())}
@@ -810,6 +862,7 @@ return()=>clearInterval(i);
 useEffect(()=>{
 const seen=new Set();let first=true;
 const load=async()=>{
+if(document.hidden&&!first)return;
 try{
 const ts=await fetchTrades();setTradesLive(true);
 const fresh=ts.filter(t=>!seen.has(t.id));fresh.forEach(t=>seen.add(t.id));
@@ -840,21 +893,21 @@ setMarkets(ms=>ms.map(apply));setSelected(s=>s&&apply(s));
 useEffect(()=>{setHistory(null);if(!selected?.tokenYes)return;let off=false;fetchHistory(selected.tokenYes).then(h=>{if(!off)setHistory(h)}).catch(()=>{if(!off)setHistory([])});return()=>{off=true}},[selected?.tokenYes]);
 
 const lastTouch=useRef(0);
-useEffect(()=>{if(markets.length===0)return;let off;const i=setInterval(()=>{if(Date.now()-lastTouch.current<45000)return;const c=marketsRef.current.filter(m=>isUSD(m)&&m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);off=setTimeout(()=>setHighlighted(null),8000)}},25000);return()=>{clearInterval(i);clearTimeout(off)}},[markets.length>0]);
+useEffect(()=>{if(markets.length===0)return;let off;if(REDUCED_MOTION)return;const i=setInterval(()=>{if(document.hidden||Date.now()-lastTouch.current<45000)return;const c=marketsRef.current.filter(m=>isUSD(m)&&m.volume>1e6);if(c.length>0){const m=c[Math.floor(Math.random()*c.length)];setHighlighted(m);off=setTimeout(()=>setHighlighted(null),8000)}},25000);return()=>{clearInterval(i);clearTimeout(off)}},[markets.length>0]);
 
 // Size the globe to its grid cell, not the window
 useEffect(()=>{const el=globeWrap.current;if(!el)return;const ro=new ResizeObserver(([e])=>setGsize({w:Math.round(e.contentRect.width),h:Math.round(e.contentRect.height)}));ro.observe(el);return()=>ro.disconnect()},[]);
 
-useEffect(()=>{if(!globeEl.current)return;const c=globeEl.current.controls();c.autoRotate=true;c.autoRotateSpeed=0.12;c.enableDamping=true;c.dampingFactor=0.08;
+useEffect(()=>{if(!globeEl.current)return;const c=globeEl.current.controls();c.autoRotate=!REDUCED_MOTION;c.autoRotateSpeed=0.12;c.enableDamping=true;c.dampingFactor=0.08;
 const touch=()=>{lastTouch.current=Date.now();setHighlighted(null)};c.addEventListener('start',touch);
 globeEl.current.pointOfView({lat:30,lng:-40,altitude:2.3},2500);return()=>c.removeEventListener('start',touch)},[gsize.w>0]);
 
 useEffect(()=>{if(!globeEl.current)return;const c=globeEl.current.controls();
 if(selected){c.autoRotate=false;globeEl.current.pointOfView({lat:selected.lat,lng:selected.lng,altitude:1.6},2000)}
-else{c.autoRotate=true;if(highlighted)globeEl.current.pointOfView({lat:highlighted.lat,lng:highlighted.lng,altitude:2.3},4000)}},[selected?.id,highlighted?.id]);
+else{c.autoRotate=!REDUCED_MOTION;if(highlighted)globeEl.current.pointOfView({lat:highlighted.lat,lng:highlighted.lng,altitude:2.3},4000)}},[selected?.id,highlighted?.id]);
 
 const filtered=useMemo(()=>markets.filter(m=>{if(srcFilter!=='all'&&m.source!==srcFilter)return false;if(search&&!m.question.toLowerCase().includes(search.toLowerCase()))return false;if(catFilter!=='All'&&m.category!==catFilter)return false;return true}),[markets,search,catFilter,srcFilter]);
-const stats=useMemo(()=>({total:markets.length,volume:markets.filter(isUSD).reduce((s,m)=>s+m.volume,0)}),[markets]);
+const stats=useMemo(()=>{const u=markets.filter(isUSD);return{total:markets.length,volume:u.reduce((s,m)=>s+m.volume,0),vol24:u.reduce((s,m)=>s+(m.vol24||0),0)}},[markets]);
 const neh=useMemo(()=>nehIndex(markets),[markets]);
 const nehPrev=useMemo(()=>nehIndex(markets.map(m=>({...m,probability:Math.min(1,Math.max(0,m.probability-(m.change24||0)))}))).score,[markets]);
 const movers=useMemo(()=>[...markets].filter(m=>m.change24).sort((a,b)=>Math.abs(b.change24)-Math.abs(a.change24)).slice(0,5),[markets]);
@@ -871,9 +924,24 @@ const baseRings=useMemo(()=>genRings(filtered,dc),[shownKey,dc]);
 const hlRing=useMemo(()=>highlighted?[{lat:highlighted.lat,lng:highlighted.lng,maxR:4,propagationSpeed:1,repeatPeriod:2200,color:'rgba(255,255,255,0.5)'}]:[],[highlighted?.id]);
 const rings=useMemo(()=>[...hlRing,...baseRings,...pulses],[hlRing,baseRings,pulses]);
 const shopPoints=useMemo(()=>(pizza?.shops||[]).map(s=>({...s,isShop:true})),[pizza]);
-const globePoints=useMemo(()=>[...filtered,...shopPoints],[filtered,shopPoints]);
-const ticker=useMemo(()=>{const head=[`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`,`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`,...movers.slice(0,3).map(m=>`${m.change24>0?'📈':'📉'} ${m.question} ${fmtProb(m.probability)} (${fmtChg(m.change24)} 24h)`),...whales.slice(0,2).map(t=>`🐋 ${fmtVol(t.usd)} ${t.side} ${t.outcome} — ${t.title}`)];if(news.length===0)return[...head,'Loading live news...',...head,'Loading live news...'];const t=[...head,...news.slice(0,15).map(n=>(n.isBreaking?'🔴 ':'')+n.source+': '+n.title)];return[...t,...t]},[news,dc,neh.score,movers,whales]);
+// Reuse the same point objects so the globe updates colours/heights in place instead of re-growing every marker on each price tick
+const pointCache=useRef(new Map());
+const globePoints=useMemo(()=>{const prev=pointCache.current,next=new Map();
+  const out=[...filtered,...shopPoints].map(d=>{const k=(d.isShop?'shop:':'')+d.id;const o=prev.get(k)||{};Object.keys(o).forEach(x=>{if(!(x in d))delete o[x]});Object.assign(o,d);next.set(k,o);return o});
+  pointCache.current=next;return out},[filtered,shopPoints]);
+const pickPoint=d=>{if(d.isShop)return;setSelected(marketsRef.current.find(m=>m.id===d.id)||{...d})};
+const tickerItems=useMemo(()=>{
+const head=[{text:`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`},{text:`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`},
+...movers.slice(0,3).map(m=>({text:`${m.change24>0?'📈':'📉'} ${m.question} ${fmtProb(m.probability)} (${fmtChg(m.change24)} 24h)`,onClick:()=>setSelected(m)})),
+...whales.slice(0,2).map(t=>({text:`🐋 ${fmtVol(t.usd)} ${t.side} ${t.outcome} — ${t.title}`,href:t.url}))];
+if(news.length===0){const r=[...head,{text:'Loading live news…'}];r.placeholder=true;return r}
+return[...head,...news.slice(0,15).map(n=>({text:(n.isBreaking?'🔴 ':'')+n.source+': '+n.title,href:n.url}))];
+},[news,dc,neh.score,movers,whales]);
 const cats=['All','Conflict','Trump','Politics','Economy','Trade'];
+const hot=useMemo(()=>hotspots(markets),[markets]);
+const hotByCountry=useMemo(()=>new Map(hot.map(h=>[h.country,h])),[hot]);
+const hotLabels=useMemo(()=>[{lat:PENTAGON.lat,lng:PENTAGON.lng,text:'PENTAGON',pentagon:true},...hot.slice(0,6).filter(h=>h.country!=='USA').map(h=>({lat:h.lat,lng:h.lng,text:h.country.toUpperCase()}))],[hot.slice(0,6).map(h=>h.country).join()]);
+const relatedFor=t=>{const l=getLocs(t||'')[0];return l?hotByCountry.get(l.country):null};
 const srcCounts=useMemo(()=>{const c={};markets.forEach(m=>c[m.source]=(c[m.source]||0)+1);return c},[markets]);
 const similar=useMemo(()=>selected?similarMarkets(selected,markets):[],[selected,markets]);
 
@@ -882,11 +950,11 @@ return(
 <Boundary name="Header" className="header"><header className="header">
 <div className="logo"><span className="logo-icon">⚡</span><div><h1>ConnecTHOR</h1><div className="logo-sub">Pentagon Pizza Index · Market Intel</div></div></div>
 <div className="stats">
-<div className="dc-pill" style={{color:DOUGHCON[dc].color,borderColor:DOUGHCON[dc].color+'88',background:DOUGHCON[dc].color+'14'}}>🍕 DOUGHCON {dc}</div>
+<div className="dc-pill" title="DOUGHCON: a DEFCON-style 5→1 level from how busy pizza places near the Pentagon are versus normal for this hour. 5 = normal, 1 = maximum." style={{color:DOUGHCON[dc].color,borderColor:DOUGHCON[dc].color+'88',background:DOUGHCON[dc].color+'14'}}>🍕 DOUGHCON {dc}</div>
 <div className="stat"><div className="stat-val mono" style={{color:nl.c}}>{neh.score}</div><div className="stat-lbl">NEH Index</div></div>
 <div className="stat"><div className="stat-val">{stats.total}</div><div className="stat-lbl">Markets</div></div>
 <div className="stat"><div className="stat-val" style={{display:'flex',alignItems:'center',gap:6,justifyContent:'center',color:wsStatus==='live'?'var(--green)':'var(--muted)'}}><span className="dot" style={{background:wsStatus==='live'?'var(--green)':'var(--faint)',animation:wsStatus==='live'?undefined:'none'}}></span>{wsStatus==='live'?'LIVE':wsStatus==='connecting'?'…':'OFF'}</div><div className="stat-lbl">Price stream</div></div>
-<div className="stat"><div className="stat-val">{fmtVol(stats.volume)}</div><div className="stat-lbl">Volume</div></div>
+<div className="stat" title={`All-time volume on real-money markets: ${fmtVol(stats.volume)}`}><div className="stat-val">{fmtVol(stats.vol24||stats.volume)}</div><div className="stat-lbl">{stats.vol24?'24h Volume':'Volume'}</div></div>
 <Clock/>
 </div>
 <input className="search" type="text" placeholder="Search markets..." value={search} onChange={e=>setSearch(e.target.value)}/>
@@ -901,7 +969,7 @@ return(
 <div className={`badge-api ${dataSource==='live'?'':'sample'}`}><span className="dot" style={{width:6,height:6,background:dataSource==='live'?'var(--green)':'var(--yellow)'}}></span>{dataSource==='live'?'Live · '+Object.keys(venues).filter(k=>venues[k]).map(srcName).join(', '):'Sample markets'} · {fmtTime(lastUpd)}{wsStatus==='live'?' · streaming':''}</div>
 
 <div className="neh">
-<div className="dc-kicker">NOTHING EVER HAPPENS INDEX</div>
+<div className="dc-kicker">NOTHING EVER HAPPENS INDEX<span className="info" title="Volume-weighted odds of escalation across real-money conflict markets (ceasefire/peace markets counted inverted). 0 = nothing ever happens, 100 = it's happening.">ⓘ</span></div>
 <div className="neh-row"><span><span className="neh-score mono" style={{color:nl.c}}>{neh.score}</span>{neh.score!==nehPrev&&<span className="mono" style={{fontSize:11,marginLeft:6,color:'var(--muted)'}}>{neh.score>nehPrev?'▲':'▼'}{Math.abs(neh.score-nehPrev)} 24h</span>}</span><span className="neh-label" style={{color:nl.c}}>{nl.t}</span></div>
 <div className="meter" role="meter" aria-valuenow={neh.score} aria-valuemin="0" aria-valuemax="100"><div className="meter-mark" style={{left:neh.score+'%'}}></div></div>
 <div className="dc-legend"><span>Nothing happens</span><span>It's happening</span></div>
@@ -926,14 +994,14 @@ return(
 {selected.vol24?<div className="detail-stat"><div className="detail-val">{fmtMoney(selected.vol24,selected.source)}</div><div className="detail-lbl">24h Vol</div></div>:null}
 <div className="detail-stat"><div className="detail-val">{selected.country}</div><div className="detail-lbl">Location</div></div>
 </div>
-{(selected.bid>0||selected.liquidity>0)&&<div className="shop-meta" style={{marginTop:8}}>{selected.bid>0&&<>Bid {fmtCents(selected.bid)} · Ask {fmtCents(selected.ask)} · </>}{selected.liquidity>0&&<>Liquidity {fmtMoney(selected.liquidity,selected.source)}</>}{selected.endDate&&<> · Ends {new Date(selected.endDate).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</>}</div>}
+{(selected.bid>0||selected.liquidity>0||selected.endDate)&&<div className="shop-meta" style={{marginTop:8}}>{[selected.bid>0&&`Bid ${fmtCents(selected.bid)} · Ask ${fmtCents(selected.ask)}`,selected.liquidity>0&&`Liquidity ${fmtMoney(selected.liquidity,selected.source)}`].filter(Boolean).join(' · ')}{selected.endDate&&<>{(selected.bid>0||selected.liquidity>0)?' · ':''}{fmtLeft(selected.endDate)}</>}</div>}
 {selected.links?.length>0&&<div className="shop-meta" style={{marginTop:4}}>Connects {selected.country} ↔ {selected.links.map(l=>l.country).join(', ')}</div>}
 {selected.tokenYes&&<PriceChart data={history&&(history.length?[...history,{t:Date.now(),p:selected.probability}]:history)}/>}
 {similar.length>0&&<div style={{marginTop:12,borderTop:'1px solid var(--border)',paddingTop:8}}><div className="dc-kicker" style={{marginBottom:4}}>SAME QUESTION ELSEWHERE</div>{similar.map(({m})=><div key={m.id} className="neh-drv" onClick={()=>setSelected(m)}><span>{SOURCES[m.source]?.icon} {srcName(m.source)} · {m.question}</span><span className="mono" style={{color:Math.abs(m.probability-selected.probability)>=0.05?'var(--yellow)':undefined}}>{fmtProb(m.probability)}{Math.abs(m.probability-selected.probability)>=0.01?' ('+(m.probability>selected.probability?'+':'−')+Math.round(Math.abs(m.probability-selected.probability)*100)+')':''}</span></div>)}</div>}
 {selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on {srcName(selected.source)} →</a>}
 </div>)}
 
-<Boundary name="Globe">{gsize.w>0&&!HAS_WEBGL&&<><FlatMap w={gsize.w} h={gsize.h} countries={countries.features} points={globePoints} arcs={arcs} selected={selected} onSelect={setSelected} dcColor={DOUGHCON[dc].color}/><div className="note" style={{position:'absolute',left:12,bottom:4,right:12,zIndex:40,color:'#94a3b8'}}>2D view: your browser has WebGL turned off, so the 3D globe can't run. In Brave, enable <b>Settings → System → Use graphics acceleration when available</b> and restart the browser.</div></>}
+<Boundary name="Globe">{gsize.w>0&&!HAS_WEBGL&&<><FlatMap w={gsize.w} h={gsize.h} countries={countries.features} points={globePoints} arcs={arcs} selected={selected} onSelect={pickPoint} dcColor={DOUGHCON[dc].color}/><div className="note" style={{position:'absolute',left:12,bottom:4,right:12,zIndex:40,color:'#94a3b8'}}>2D view: your browser has WebGL turned off, so the 3D globe can't run. In Brave, enable <b>Settings → System → Use graphics acceleration when available</b> and restart the browser.</div></>}
 {gsize.w>0&&HAS_WEBGL&&<Globe ref={globeEl} width={gsize.w} height={gsize.h} globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg" bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="https://unpkg.com/three-globe/example/img/night-sky.png"
 polygonsData={countries.features||[]} polygonCapColor={()=>'rgba(0,0,0,0)'} polygonSideColor={()=>'rgba(100,150,200,0.05)'} polygonStrokeColor={()=>'rgba(100,180,255,0.25)'} polygonAltitude={0.005}
 pointsData={globePoints} pointLat="lat" pointLng="lng"
@@ -941,8 +1009,8 @@ pointAltitude={d=>d.isShop?0.01+(d.ratio||0)*0.02:Math.min(0.05+(isUSD(d)?d.volu
 pointRadius={d=>d.isShop?0.12:(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35}
 pointColor={d=>d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'}
 pointLabel={d=>d.isShop?'<div style="background:rgba(10,15,26,0.95);padding:8px 10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3)"><div style="font-weight:700;color:white;font-size:11px">🍕 '+d.name+'</div><div style="color:#94a3b8;font-size:10px">'+SHOP_STATUS(d.ratio).t+(d.ratio!=null?' · '+Math.round(d.ratio*100)+'% of usual':'')+'</div></div>':'<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">'+srcName(d.source).toUpperCase()+' • '+d.country+'</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">'+d.question+'</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">'+fmtProb(d.probability)+'</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">'+(d.volume>0?fmtMoney(d.volume,d.source):'—')+'</div></div></div></div>'}
-onPointClick={d=>{if(!d.isShop)setSelected(d)}}
-labelsData={[{lat:PENTAGON.lat,lng:PENTAGON.lng,text:'PENTAGON'}]} labelLat="lat" labelLng="lng" labelText="text" labelSize={0.6} labelDotRadius={0.25} labelColor={()=>DOUGHCON[dc].color} labelResolution={2}
+onPointClick={pickPoint} pointsTransitionDuration={REDUCED_MOTION?0:900} arcsTransitionDuration={REDUCED_MOTION?0:1500} arcDashInitialGap="initGap"
+labelsData={hotLabels} labelLat="lat" labelLng="lng" labelText="text" labelSize={d=>d.pentagon?0.9:1.05} labelDotRadius={d=>d.pentagon?0.3:0.18} labelColor={d=>d.pentagon?DOUGHCON[dc].color:'rgba(226,232,240,0.75)'} labelAltitude={0.012} labelsTransitionDuration={REDUCED_MOTION?0:1200} labelResolution={2}
 arcsData={arcs} arcStartLat="startLat" arcStartLng="startLng" arcEndLat="endLat" arcEndLng="endLng" arcColor="color" arcAltitude="altitude" arcStroke="stroke" arcDashLength="dashLength" arcDashGap="dashGap" arcDashAnimateTime="dashAnimateTime"
 ringsData={rings} ringLat="lat" ringLng="lng" ringMaxRadius="maxR" ringPropagationSpeed="propagationSpeed" ringRepeatPeriod="repeatPeriod" ringColor={d=>t=>{const c=d.color;return c.startsWith('#')?c+Math.round((1-t)*200).toString(16).padStart(2,'0'):c}}
 atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
@@ -950,8 +1018,9 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
 
 <Boundary name="Right panel" className="right"><aside className="right">
 <div className="act-tabs">
-<button className={`act-tab ${tab==='news'?'active':''}`} onClick={()=>setTab('news')}>📰 Intel Feed</button>
+<button className={`act-tab ${tab==='news'?'active':''}`} onClick={()=>setTab('news')}>📰 Intel</button>
 <button className={`act-tab ${tab==='markets'?'active':''}`} onClick={()=>setTab('markets')}>📊 Markets</button>
+<button className={`act-tab ${tab==='hot'?'active':''}`} onClick={()=>setTab('hot')}>🌍 Hotspots</button>
 <button className={`act-tab ${tab==='activity'?'active':''}`} onClick={()=>setTab('activity')}>🔴 Flow{tradesLive&&whales.length>0&&<span className="badge" style={{marginLeft:4,background:'var(--yellow)',color:'#0a0f1a'}}>{whales.length}</span>}</button>
 </div>
 <div className="scroll">
@@ -965,8 +1034,18 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
 <div className="news-src">{n.isBreaking&&<span className="dot red" style={{width:6,height:6}}></span>}{n.source}{tg&&<span className={`tag ${tg}`}>{tg}</span>}</div>
 <div className="news-title">{n.title}</div>
 <div className="news-time">{fmtTime(n.time)}</div>
+{(()=>{const h=relatedFor(n.title);return h&&h.top?<span className="news-rel" onClick={e=>{e.preventDefault();e.stopPropagation();setSelected(h.top)}}>↳ {h.country} · {h.n} market{h.n>1?'s':''} · {h.top.question.length>48?h.top.question.slice(0,47)+'…':h.top.question} <b>{fmtProb(h.top.probability)}</b></span>:null})()}
 </a>)})}
 </>)}
+{tab==='hot'&&(<div className="tab-fade">
+<div className="note" style={{paddingTop:0}}>Countries ranked by escalation odds × money at stake on real-money markets. Click to fly there.</div>
+{hot.slice(0,15).map((h,i)=>(
+<div key={h.country} className="hot" onClick={()=>h.top&&setSelected(h.top)}>
+<div className="hot-hd"><span className="hot-name"><span className="muted mono" style={{fontSize:11,marginRight:6}}>{i+1}</span>{h.country}</span><span className="shop-meta">{h.n} market{h.n>1?'s':''}{h.vol24?' · '+fmtVol(h.vol24)+' 24h':''}</span></div>
+{h.tension!=null&&<><div className="hot-bar"><span style={{width:Math.round(h.tension*100)+'%',background:nehLabel(Math.round(h.tension*100)).c}}></span></div><div className="shop-meta">Escalation odds {Math.round(h.tension*100)}% · {nehLabel(Math.round(h.tension*100)).t}</div></>}
+{h.top&&<div className="shop-meta" style={{marginTop:4,color:'var(--text)'}}>{h.top.question} <b className="mono">{fmtProb(h.top.probability)}</b></div>}
+</div>))}
+</div>)}
 {tab==='markets'&&(<>
 <div className="tabs"><button className={`tab ${srcFilter==='all'?'active':''}`} onClick={()=>setSrcFilter('all')}>All {markets.length}</button>{Object.keys(SOURCES).filter(k=>srcCounts[k]).map(k=><button key={k} className={`tab ${srcFilter===k?'active':''}`} onClick={()=>setSrcFilter(k)}>{srcName(k)} {srcCounts[k]}</button>)}</div>
 <div className="tabs">{cats.map(c=><button key={c} className={`tab ${catFilter===c?'active':''}`} onClick={()=>setCatFilter(c)}>{c}</button>)}</div>
@@ -1000,7 +1079,7 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
 
 <Boundary name="Ticker" className="ticker"><div className="ticker">
 <span className="ticker-lbl"><span className="livedot"></span>BREAKING</span>
-<div className="ticker-scroll" style={{animationDuration:Math.max(60,ticker.join('').length*0.09)+'s'}}>{ticker.map((t,i)=><span key={i} className="ticker-item">{t}</span>)}</div>
+<Ticker items={tickerItems}/>
 </div></Boundary>
 </div>
 );
