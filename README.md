@@ -13,6 +13,12 @@ Pentagon Pizza Index + geopolitical prediction-market intel on a 3D globe, in a 
 - **Flow tab** - real Polymarket trades with a whale filter; whale trades arc across the globe
 - **Hotspots tab** - countries ranked by escalation odds × money at stake, with the top market for each; top hotspots are labelled on the globe
 - **Linked intel** - headlines that mention a country link to that country's busiest market
+- **✈ Military aircraft** - live positions of military aircraft broadcasting ADS-B ([adsb.lol](https://adsb.lol), free community data; many military flights don't broadcast, so it's a partial picture)
+- **Layer toggles** - switch markets, connections, trades, pizza shops and aircraft on/off (remembered per browser)
+- **News coverage gauge** - share of world news about military conflict over 7 days ([GDELT](https://www.gdeltproject.org/))
+- **Signal types** - headlines classified as Nuclear / Aerial / Naval / Cyber / Ground / Military / Diplomacy / Economy, with filters
+- **☢ Doomsday Clock** - current setting from the Bulletin of the Atomic Scientists (85 seconds to midnight, Jan 2026)
+- **Shareable links** - `#m=<market id>` opens a market directly; Esc closes it
 - **Calm motion** - slow auto-rotate and spotlight, smooth in-place updates, a ticker that only refreshes between loops; honours the OS "reduce motion" setting
 
 ### About the pizza data
@@ -137,7 +143,7 @@ const getColor = (market) => {
 ```
 polyglobe/
 ├── index.html      # Complete standalone app
-├── favicon.svg     # Site icon
+├── favicon.svg     # Site icon (+ favicon.ico, favicon-32.png, apple-touch-icon.png, icon-512.png)
 └── README.md       # This file
 ```
 

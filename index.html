@@ -8,7 +8,11 @@
   <meta name="theme-color" content="#0a0f1a">
   <meta property="og:title" content="ConnecTHOR — Pizza Index & Market Intel">
   <meta property="og:description" content="Pentagon Pizza Index, DOUGHCON level and live geopolitical prediction markets on a 3D globe.">
+  <link rel="icon" href="favicon.ico" sizes="any">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta property="og:image" content="icon-512.png">
   <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/react-globe.gl@2.27.2"></script>
@@ -156,6 +160,21 @@
     .ticker-item{padding:0 40px;font-size:12px}
     .ticker-item::after{content:'•';margin-left:40px;color:var(--red)}
     .loading{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg)}
+        .layers{position:absolute;left:12px;bottom:12px;z-index:45;display:flex;gap:4px;flex-wrap:wrap;max-width:calc(100% - 24px)}
+    .layer{display:flex;align-items:center;gap:5px;padding:5px 9px;border-radius:999px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:10px;font-weight:600;cursor:pointer;transition:all .2s}
+    .layer.on{color:var(--text);border-color:rgba(59,130,246,0.6);background:rgba(59,130,246,0.15)}
+    .layer .sw{width:7px;height:7px;border-radius:50%}
+    .doom{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:6px;border-top:1px solid var(--border);font-size:11px;color:var(--muted);text-decoration:none}
+    .doom:hover{color:var(--text)}
+    .chips{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px}
+    .chip-btn{font-size:9px;font-weight:700;padding:3px 7px;border-radius:4px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;letter-spacing:.04em}
+    .chip-btn.on{color:var(--text);border-color:var(--blue);background:rgba(59,130,246,0.15)}
+    .cov{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px}
+    .tag.AERIAL{background:rgba(56,189,248,0.15);color:#7dd3fc}
+    .tag.NAVAL{background:rgba(45,212,191,0.15);color:#5eead4}
+    .tag.GROUND{background:rgba(249,115,22,0.15);color:#fdba74}
+    .tag.NUCLEAR{background:rgba(234,179,8,0.18);color:#fde047}
+    .tag.CYBER{background:rgba(168,85,247,0.15);color:#d8b4fe}
     @keyframes fadeUp{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
     @keyframes fadeIn{from{opacity:0}to{opacity:1}}
     .app{animation:fadeIn .6s ease-out}
@@ -594,6 +613,24 @@ function similarMarkets(m,all){
   return all.filter(x=>x.source!==m.source).map(x=>{const b=toks(x.question);let n=0;a.forEach(w=>{if(b.has(w))n++});return{m:x,score:n/(a.size+b.size-n)}}).filter(x=>x.score>=0.3).sort((x,y)=>y.score-x.score).slice(0,4);
 }
 
+// ============ OSINT LAYERS ============
+// Military aircraft broadcasting ADS-B, from the community aggregator adsb.lol (free, no key)
+async function fetchMilAir(){
+  const d=await getJSON('https://api.adsb.lol/v2/mil',10000);
+  const ac=Array.isArray(d.ac)?d.ac:Array.isArray(d.aircraft)?d.aircraft:[];
+  return ac.filter(a=>isFinite(a.lat)&&isFinite(a.lon)&&a.alt_baro!=='ground').map(a=>({id:'air-'+a.hex,isAir:true,lat:+a.lat,lng:+a.lon,
+    callsign:String(a.flight||a.r||a.hex||'').trim(),type:a.t||a.desc||'',reg:a.r||'',alt:typeof a.alt_baro==='number'?a.alt_baro:null,speed:a.gs!=null?Math.round(a.gs):null,track:a.track,squawk:a.squawk||''}));
+}
+// Share of world news coverage about military conflict, last 7 days (GDELT DOC 2.0)
+const GDELT_Q='(airstrike OR missile OR "military strike" OR invasion OR "armed conflict" OR shelling)';
+async function fetchCoverage(){
+  const d=await getJSON(`https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(GDELT_Q)}&mode=timelinevol&timespan=7d&timelinesmooth=3&format=json`,12000);
+  const pts=(d.timeline?.[0]?.data||[]).map(x=>{const m=String(x.date).match(/^(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?/);return m?{t:Date.UTC(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0)),v:num(x.value)}:null}).filter(Boolean);
+  return pts.length>2?pts:null;
+}
+// Bulletin of the Atomic Scientists, set 27 Jan 2026
+const DOOMSDAY={seconds:85,set:'Jan 2026',prev:89,url:'https://thebulletin.org/doomsday-clock/'};
+
 // ============ NOTHING EVER HAPPENS INDEX ============
 // Volume-weighted probability of escalation across conflict markets (ceasefire/peace
 // markets are inverted). 0 = nothing ever happens, 100 = it's happening.
@@ -607,7 +644,18 @@ function nehIndex(ms){
 }
 const nehLabel=s=>s<20?{t:'Nothing ever happens',c:'#22c55e'}:s<35?{t:'Simmering',c:'#84cc16'}:s<50?{t:'Elevated',c:'#eab308'}:s<70?{t:'Something is happening',c:'#f97316'}:{t:"It's happening",c:'#ef4444'};
 
-function newsTag(title){if(/military|troops|strike|missile|army|navy|air force|drone|attack|war\b|pentagon|defen[cs]e|bomb|killed|soldier/i.test(title))return'MILITARY';if(/talks|summit|ceasefire|sanction|treaty|minister|diplomat|\bun\b|nato|envoy|election/i.test(title))return'DIPLOMACY';if(/market|tariff|econom|inflation|stocks|oil|trade|bank/i.test(title))return'ECONOMY';return null}
+// Signal types, in priority order (first match wins)
+const SIGNALS=[
+  ['NUCLEAR',/nuclear|uranium|enrichment|warhead|icbm|ballistic missile|radiation/i],
+  ['AERIAL',/air ?strike|drone|missile|fighter jet|air force|aircraft|airspace|bomber|shot down/i],
+  ['NAVAL',/navy|naval|warship|destroyer|carrier|submarine|strait|vessel|tanker|maritime|houthi|red sea/i],
+  ['CYBER',/cyber|hack|ransomware|malware|outage|data breach/i],
+  ['GROUND',/troops|soldiers|army|offensive|front ?line|shelling|artillery|invasion|ground (assault|operation)|killed|clashes|militants/i],
+  ['MILITARY',/military|pentagon|defen[cs]e|war\b|attack|ceasefire|nato/i],
+  ['DIPLOMACY',/talks|summit|sanction|treaty|minister|diplomat|\bun\b|envoy|election|president|accord/i],
+  ['ECONOMY',/market|tariff|econom|inflation|stocks|oil|trade|bank|rates?\b/i],
+];
+function newsTag(title){for(const[k,re]of SIGNALS)if(re.test(title))return k;return null}
 
 // Arcs connect every place a market names (e.g. "Israel strike on Iran" → Israel ↔ Iran),
 // plus Washington → the busiest US-linked hotspots
@@ -666,10 +714,10 @@ function FlatMap({w,h,countries,points,arcs,selected,onSelect,dcColor}){
     <rect x={ox-180*sc} y={oy-90*sc} width={360*sc} height={180*sc} fill="#0b1324" rx="6"/>
     {paths}
     {arcs.filter(a=>a.endLat!=null).slice(0,40).map((a,i)=>{const[x1,y1]=px(a.startLng,a.startLat),[x2,y2]=px(a.endLng,a.endLat);const mx=(x1+x2)/2,my=(y1+y2)/2-Math.hypot(x2-x1,y2-y1)*0.25;return<path key={i} d={`M${x1},${y1} Q${mx},${my} ${x2},${y2}`} fill="none" stroke={(a.color&&a.color[0])||'rgba(59,130,246,0.6)'} strokeWidth="1.2" opacity="0.7"/>})}
-    {points.map(d=>{const[x,y]=px(d.lng,d.lat);const sel=selected?.id===d.id;return<circle key={d.id} cx={x} cy={y} r={d.isShop?2:sel?7:4+Math.min(d.volume/2e7,4)} fill={d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'} stroke="#0a0f1a" strokeWidth="1.5" style={{cursor:d.isShop?'default':'pointer'}} onMouseEnter={()=>setHov(d)} onMouseLeave={()=>setHov(null)} onClick={()=>!d.isShop&&onSelect(d)}/>})}
+    {points.map(d=>{const[x,y]=px(d.lng,d.lat);const sel=selected?.id===d.id;return<circle key={d.id} cx={x} cy={y} r={d.isAir?1.8:d.isShop?2:sel?7:4+Math.min((d.volume||0)/2e7,4)} fill={d.isAir?'#7dd3fc':d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'} stroke="#0a0f1a" strokeWidth="1.5" style={{cursor:d.isShop?'default':'pointer'}} onMouseEnter={()=>setHov(d)} onMouseLeave={()=>setHov(null)} onClick={()=>!d.isShop&&onSelect(d)}/>})}
     <circle cx={pxP} cy={pyP} r="5" fill="none" stroke={dcColor} strokeWidth="2"><animate attributeName="r" values="4;14;4" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0;1" dur="2s" repeatCount="indefinite"/></circle>
     <text x={pxP+8} y={pyP+4} fill={dcColor} fontSize="10" fontWeight="700">PENTAGON</text>
-    {hov&&(()=>{const[x,y]=px(hov.lng,hov.lat);const t=hov.isShop?'🍕 '+hov.name:hov.question+' · '+fmtProb(hov.probability);const tw=Math.min(t.length*6.2+16,300);const tx=Math.min(Math.max(x-tw/2,4),W-tw-4);return<g pointerEvents="none"><rect x={tx} y={y-34} width={tw} height="22" rx="5" fill="rgba(10,15,26,0.95)" stroke="rgba(59,130,246,0.4)"/><text x={tx+8} y={y-19} fill="#f1f5f9" fontSize="11">{t.length>48?t.slice(0,47)+'…':t}</text></g>})()}
+    {hov&&(()=>{const[x,y]=px(hov.lng,hov.lat);const t=hov.isAir?'✈ '+(hov.callsign||'Military aircraft')+(hov.type?' · '+hov.type:''):hov.isShop?'🍕 '+hov.name:hov.question+' · '+fmtProb(hov.probability);const tw=Math.min(t.length*6.2+16,300);const tx=Math.min(Math.max(x-tw/2,4),W-tw-4);return<g pointerEvents="none"><rect x={tx} y={y-34} width={tw} height="22" rx="5" fill="rgba(10,15,26,0.95)" stroke="rgba(59,130,246,0.4)"/><text x={tx+8} y={y-19} fill="#f1f5f9" fontSize="11">{t.length>48?t.slice(0,47)+'…':t}</text></g>})()}
   </svg>);
 }
 
@@ -763,6 +811,28 @@ function PriceChart({data}){
   </div>);
 }
 
+function CoverageChart({data}){
+  const[hov,setHov]=useState(null);
+  if(!data)return null;
+  const W=300,H=40,vs=data.map(d=>d.v),lo=Math.min(...vs),hi=Math.max(...vs);
+  const x=i=>i/(data.length-1)*W,y=v=>H-4-(v-lo)/(hi-lo||1)*(H-8);
+  const pts=data.map((d,i)=>`${x(i).toFixed(1)},${y(d.v).toFixed(1)}`).join(' ');
+  const half=Math.floor(data.length/2),avg=a=>a.reduce((s,d)=>s+d.v,0)/a.length;
+  const chg=avg(data.slice(half))/avg(data.slice(0,half))-1;
+  const i=hov??data.length-1,d=data[i];
+  return(<div className="cov">
+    <div className="spark-hd" style={{marginTop:0}}><span>Conflict share of world news · 7d <span style={{color:chg>0?'var(--red)':'var(--green)'}}>{chg>0?'▲':'▼'}{Math.abs(chg*100).toFixed(0)}%</span></span><span className="mono">{new Date(d.t).toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})} · {d.v.toFixed(2)}%</span></div>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{display:'block'}} onMouseLeave={()=>setHov(null)}
+      onMouseMove={e=>{const r=e.currentTarget.getBoundingClientRect();setHov(Math.max(0,Math.min(data.length-1,Math.round((e.clientX-r.left)/r.width*(data.length-1)))))}}>
+      <polyline points={`0,${H} ${pts} ${W},${H}`} fill="rgba(239,68,68,0.08)" stroke="none"/>
+      <polyline points={pts} fill="none" stroke="#fca5a5" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke"/>
+      {hov!=null&&<line x1={x(i)} x2={x(i)} y1="0" y2={H} stroke="rgba(226,232,240,0.4)"/>}
+      <circle cx={x(i)} cy={y(d.v)} r="3.5" fill="#fca5a5" stroke="#0f172a" strokeWidth="2"/>
+    </svg>
+    <div className="shop-meta" style={{marginTop:2}}>Source: GDELT, share of all monitored news mentioning strikes, missiles, invasion or shelling</div>
+  </div>);
+}
+
 function PizzaPanel({pizza,history}){
   if(!pizza)return<div className="news-loading">Loading pizza intel…</div>;
   const dc=doughconFor(pizza.index);const D=DOUGHCON[dc];
@@ -816,6 +886,12 @@ const[pulses,setPulses]=useState([]);
 const[history,setHistory]=useState(null);
 const[venues,setVenues]=useState({});
 const[srcFilter,setSrcFilter]=useState('all');
+const[air,setAir]=useState(null);
+const[coverage,setCoverage]=useState(null);
+const[sigFilter,setSigFilter]=useState('ALL');
+const LAYER_DEFAULTS={markets:true,arcs:true,trades:true,pizza:true,air:true};
+const[layers,setLayers]=useState(()=>{try{return{...LAYER_DEFAULTS,...JSON.parse(localStorage.getItem('ct-layers')||'{}')}}catch(e){return LAYER_DEFAULTS}});
+const toggleLayer=k=>setLayers(l=>{const n={...l,[k]:!l[k]};try{localStorage.setItem('ct-layers',JSON.stringify(n))}catch(e){}return n});
 const marketsRef=useRef(markets);marketsRef.current=markets;
 const pizzaRef=useRef(null);pizzaRef.current=pizza;
 const newsRef=useRef(0);newsRef.current=news.length;
@@ -857,6 +933,19 @@ loadPoly();const i=setInterval(loadPoly,300000);
 fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson').then(r=>r.json()).then(d=>setCountries(d)).catch(()=>{});
 return()=>clearInterval(i);
 },[]);
+
+// Military aircraft every 60s, GDELT coverage every 30 min
+useEffect(()=>{
+const loadAir=async()=>{if(document.hidden&&air)return;try{setAir(await fetchMilAir())}catch(e){setAir(a=>a||[]);console.log('Aircraft feed unavailable:',e.message)}};
+const loadCov=async()=>{try{const c=await fetchCoverage();if(c)setCoverage(c)}catch(e){console.log('GDELT unavailable:',e.message)}};
+loadAir();loadCov();const i=setInterval(loadAir,60000),j=setInterval(loadCov,1800000);return()=>{clearInterval(i);clearInterval(j)};
+},[]);
+
+// Shareable links: #m=<market id>; Esc closes the detail panel
+const pendingHash=useRef(decodeURIComponent((location.hash.match(/m=([^&]+)/)||[])[1]||''));
+useEffect(()=>{if(!pendingHash.current)return;const m=markets.find(x=>x.id===pendingHash.current);if(m){setSelected(m);pendingHash.current=''}},[markets]);
+useEffect(()=>{const h=selected?'#m='+encodeURIComponent(selected.id):'';if(location.hash!==h)window.history.replaceState(null,'',h||location.pathname+location.search)},[selected?.id]);
+useEffect(()=>{const k=e=>{if(e.key==='Escape')setSelected(null)};window.addEventListener('keydown',k);return()=>window.removeEventListener('keydown',k)},[]);
 
 // Real trades: poll the Data API, pulse the globe where they land, arc in the whales
 useEffect(()=>{
@@ -919,17 +1008,17 @@ const dc=pizza?doughconFor(pizza.index):5;
 // Rebuilding arc/ring objects restarts their animations, so key them on which markets are shown, not on prices
 const shownKey=filtered.map(m=>m.id).join('|');
 const baseArcs=useMemo(()=>genArcs(filtered),[shownKey]);
-const arcs=useMemo(()=>flowArcs.length?baseArcs.concat(flowArcs):baseArcs,[baseArcs,flowArcs]);
+const arcs=useMemo(()=>{const a=layers.arcs?baseArcs:[];return layers.trades&&flowArcs.length?a.concat(flowArcs):a},[baseArcs,flowArcs,layers.arcs,layers.trades]);
 const baseRings=useMemo(()=>genRings(filtered,dc),[shownKey,dc]);
 const hlRing=useMemo(()=>highlighted?[{lat:highlighted.lat,lng:highlighted.lng,maxR:4,propagationSpeed:1,repeatPeriod:2200,color:'rgba(255,255,255,0.5)'}]:[],[highlighted?.id]);
-const rings=useMemo(()=>[...hlRing,...baseRings,...pulses],[hlRing,baseRings,pulses]);
+const rings=useMemo(()=>[...hlRing,...(layers.markets?baseRings:baseRings.slice(-1)),...(layers.trades?pulses:[])],[hlRing,baseRings,pulses,layers.markets,layers.trades]);
 const shopPoints=useMemo(()=>(pizza?.shops||[]).map(s=>({...s,isShop:true})),[pizza]);
 // Reuse the same point objects so the globe updates colours/heights in place instead of re-growing every marker on each price tick
 const pointCache=useRef(new Map());
 const globePoints=useMemo(()=>{const prev=pointCache.current,next=new Map();
-  const out=[...filtered,...shopPoints].map(d=>{const k=(d.isShop?'shop:':'')+d.id;const o=prev.get(k)||{};Object.keys(o).forEach(x=>{if(!(x in d))delete o[x]});Object.assign(o,d);next.set(k,o);return o});
-  pointCache.current=next;return out},[filtered,shopPoints]);
-const pickPoint=d=>{if(d.isShop)return;setSelected(marketsRef.current.find(m=>m.id===d.id)||{...d})};
+  const out=[...(layers.markets?filtered:[]),...(layers.pizza?shopPoints:[]),...(layers.air&&air?air:[])].map(d=>{const k=(d.isShop?'shop:':'')+d.id;const o=prev.get(k)||{};Object.keys(o).forEach(x=>{if(!(x in d))delete o[x]});Object.assign(o,d);next.set(k,o);return o});
+  pointCache.current=next;return out},[filtered,shopPoints,air,layers.markets,layers.pizza,layers.air]);
+const pickPoint=d=>{if(d.isShop||d.isAir){if(d.isAir)window.open('https://globe.adsb.lol/?icao='+d.id.slice(4),'_blank','noopener');return}setSelected(marketsRef.current.find(m=>m.id===d.id)||{...d})};
 const tickerItems=useMemo(()=>{
 const head=[{text:`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`},{text:`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`},
 ...movers.slice(0,3).map(m=>({text:`${m.change24>0?'📈':'📉'} ${m.question} ${fmtProb(m.probability)} (${fmtChg(m.change24)} 24h)`,onClick:()=>setSelected(m)})),
@@ -974,6 +1063,7 @@ return(
 <div className="meter" role="meter" aria-valuenow={neh.score} aria-valuemin="0" aria-valuemax="100"><div className="meter-mark" style={{left:neh.score+'%'}}></div></div>
 <div className="dc-legend"><span>Nothing happens</span><span>It's happening</span></div>
 <div className="neh-drivers">{neh.drivers.map(m=><div key={m.id} className="neh-drv" onClick={()=>setSelected(m)}><span>{m.question}</span><span className="mono">{fmtProb(m.probability)}</span></div>)}</div>
+<a className="doom" href={DOOMSDAY.url} target="_blank" rel="noopener noreferrer" title={`Bulletin of the Atomic Scientists, set ${DOOMSDAY.set} (was ${DOOMSDAY.prev}s in 2025)`}><span>☢ Doomsday Clock</span><span className="mono" style={{color:'#fca5a5'}}>{DOOMSDAY.seconds} sec to midnight</span></a>
 </div>
 
 {highlighted&&!selected&&(
@@ -1001,14 +1091,18 @@ return(
 {selected.url&&<a href={selected.url} target="_blank" rel="noopener noreferrer" className="detail-link">View on {srcName(selected.source)} →</a>}
 </div>)}
 
-<Boundary name="Globe">{gsize.w>0&&!HAS_WEBGL&&<><FlatMap w={gsize.w} h={gsize.h} countries={countries.features} points={globePoints} arcs={arcs} selected={selected} onSelect={pickPoint} dcColor={DOUGHCON[dc].color}/><div className="note" style={{position:'absolute',left:12,bottom:4,right:12,zIndex:40,color:'#94a3b8'}}>2D view: your browser has WebGL turned off, so the 3D globe can't run. In Brave, enable <b>Settings → System → Use graphics acceleration when available</b> and restart the browser.</div></>}
+<div className="layers" role="group" aria-label="Globe layers">
+{[['markets','Markets','#eab308',filtered.length],['arcs','Connections','#f97316',null],['trades','Trades','#22c55e',null],['pizza','Pizza','#3b82f6',null],['air','Mil. aircraft','#7dd3fc',air?air.length:null]].map(([k,l,c,n])=>(
+<button key={k} className={`layer ${layers[k]?'on':''}`} aria-pressed={!!layers[k]} onClick={()=>toggleLayer(k)} title={k==='air'?'Military aircraft broadcasting ADS-B (adsb.lol). Many military flights don\'t broadcast, so this is a partial picture.':undefined}><span className="sw" style={{background:layers[k]?c:'var(--faint)'}}></span>{l}{n!=null&&<span className="mono" style={{opacity:.7}}>{n}</span>}</button>))}
+</div>
+<Boundary name="Globe">{gsize.w>0&&!HAS_WEBGL&&<><FlatMap w={gsize.w} h={gsize.h} countries={countries.features} points={globePoints} arcs={arcs} selected={selected} onSelect={pickPoint} dcColor={DOUGHCON[dc].color}/><div className="note" style={{position:'absolute',left:12,bottom:40,right:12,zIndex:40,color:'#94a3b8'}}>2D view: your browser has WebGL turned off, so the 3D globe can't run. In Brave, enable <b>Settings → System → Use graphics acceleration when available</b> and restart the browser.</div></>}
 {gsize.w>0&&HAS_WEBGL&&<Globe ref={globeEl} width={gsize.w} height={gsize.h} globeImageUrl="https://unpkg.com/three-globe/example/img/earth-night.jpg" bumpImageUrl="https://unpkg.com/three-globe/example/img/earth-topology.png" backgroundImageUrl="https://unpkg.com/three-globe/example/img/night-sky.png"
 polygonsData={countries.features||[]} polygonCapColor={()=>'rgba(0,0,0,0)'} polygonSideColor={()=>'rgba(100,150,200,0.05)'} polygonStrokeColor={()=>'rgba(100,180,255,0.25)'} polygonAltitude={0.005}
 pointsData={globePoints} pointLat="lat" pointLng="lng"
-pointAltitude={d=>d.isShop?0.01+(d.ratio||0)*0.02:Math.min(0.05+(isUSD(d)?d.volume:d.volume/100)/50000000,0.18)}
-pointRadius={d=>d.isShop?0.12:(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35}
-pointColor={d=>d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'}
-pointLabel={d=>d.isShop?'<div style="background:rgba(10,15,26,0.95);padding:8px 10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3)"><div style="font-weight:700;color:white;font-size:11px">🍕 '+d.name+'</div><div style="color:#94a3b8;font-size:10px">'+SHOP_STATUS(d.ratio).t+(d.ratio!=null?' · '+Math.round(d.ratio*100)+'% of usual':'')+'</div></div>':'<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">'+srcName(d.source).toUpperCase()+' • '+d.country+'</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">'+d.question+'</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">'+fmtProb(d.probability)+'</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">'+(d.volume>0?fmtMoney(d.volume,d.source):'—')+'</div></div></div></div>'}
+pointAltitude={d=>d.isAir?0.015+Math.min((d.alt||0)/45000,1)*0.05:d.isShop?0.01+(d.ratio||0)*0.02:Math.min(0.05+(isUSD(d)?d.volume:d.volume/100)/50000000,0.18)}
+pointRadius={d=>d.isAir?0.14:d.isShop?0.12:(selected?.id===d.id||highlighted?.id===d.id)?0.55:0.35}
+pointColor={d=>d.isAir?'#7dd3fc':d.isShop?SHOP_STATUS(d.ratio).c:d.category==='Conflict'?'#f97316':d.probability>=0.7?'#22c55e':d.probability>=0.4?'#eab308':'#ef4444'}
+pointLabel={d=>d.isAir?'<div style="background:rgba(10,15,26,0.95);padding:8px 10px;border-radius:8px;border:1px solid rgba(125,211,252,0.4)"><div style="font-weight:700;color:white;font-size:11px">✈ '+(d.callsign||'Unknown')+'</div><div style="color:#94a3b8;font-size:10px">'+[d.type,d.reg].filter(Boolean).join(' · ')+'</div><div style="color:#94a3b8;font-size:10px">'+[d.alt!=null?d.alt.toLocaleString()+' ft':'',d.speed!=null?d.speed+' kt':'',d.squawk?'squawk '+d.squawk:''].filter(Boolean).join(' · ')+'</div><div style="color:#64748b;font-size:9px;margin-top:3px">Military ADS-B · adsb.lol · click to track</div></div>':d.isShop?'<div style="background:rgba(10,15,26,0.95);padding:8px 10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3)"><div style="font-weight:700;color:white;font-size:11px">🍕 '+d.name+'</div><div style="color:#94a3b8;font-size:10px">'+SHOP_STATUS(d.ratio).t+(d.ratio!=null?' · '+Math.round(d.ratio*100)+'% of usual':'')+'</div></div>':'<div style="background:rgba(10,15,26,0.95);padding:10px;border-radius:8px;border:1px solid rgba(59,130,246,0.3);max-width:220px"><div style="font-size:9px;color:#60a5fa;margin-bottom:3px">'+srcName(d.source).toUpperCase()+' • '+d.country+'</div><div style="font-weight:600;color:white;margin-bottom:6px;font-size:11px">'+d.question+'</div><div style="display:flex;gap:12px"><div><div style="font-size:8px;color:#6b7280">YES</div><div style="color:#22c55e;font-weight:700">'+fmtProb(d.probability)+'</div></div><div><div style="font-size:8px;color:#6b7280">VOL</div><div style="color:white;font-weight:600">'+(d.volume>0?fmtMoney(d.volume,d.source):'—')+'</div></div></div></div>'}
 onPointClick={pickPoint} pointsTransitionDuration={REDUCED_MOTION?0:900} arcsTransitionDuration={REDUCED_MOTION?0:1500} arcDashInitialGap="initGap"
 labelsData={hotLabels} labelLat="lat" labelLng="lng" labelText="text" labelSize={d=>d.pentagon?0.9:1.05} labelDotRadius={d=>d.pentagon?0.3:0.18} labelColor={d=>d.pentagon?DOUGHCON[dc].color:'rgba(226,232,240,0.75)'} labelAltitude={0.012} labelsTransitionDuration={REDUCED_MOTION?0:1200} labelResolution={2}
 arcsData={arcs} arcStartLat="startLat" arcStartLng="startLng" arcEndLat="endLat" arcEndLng="endLng" arcColor="color" arcAltitude="altitude" arcStroke="stroke" arcDashLength="dashLength" arcDashGap="dashGap" arcDashAnimateTime="dashAnimateTime"
@@ -1029,7 +1123,9 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
 <span className={`news-status ${newsSource==='rss'?'rss':''}`}>{newsSource==='newsapi'?'⚡ NewsAPI':newsSource==='rss'?'📡 RSS Feeds':'⏳ Connecting'}</span>
 {newsLastUpd&&<span style={{fontSize:9,color:'var(--muted)'}}>Updated {fmtTime(newsLastUpd)}</span>}
 </div>
-{newsLoading?<div className="news-loading">⏳ Fetching live news...</div>:news.length===0?<div className="news-loading">No news available</div>:news.slice(0,20).map(n=>{const tg=newsTag(n.title);return(
+<CoverageChart data={coverage}/>
+{news.length>0&&<div className="chips">{['ALL',...SIGNALS.map(x=>x[0])].filter(k=>k==='ALL'||news.some(n=>newsTag(n.title)===k)).map(k=><button key={k} className={`chip-btn ${sigFilter===k?'on':''}`} onClick={()=>setSigFilter(k)}>{k}</button>)}</div>}
+{newsLoading?<div className="news-loading">⏳ Fetching live news...</div>:news.length===0?<div className="news-loading">No news available</div>:news.filter(n=>sigFilter==='ALL'||newsTag(n.title)===sigFilter).slice(0,25).map(n=>{const tg=newsTag(n.title);return(
 <a key={n.id} href={n.url} target="_blank" rel="noopener noreferrer" className={`news ${n.isBreaking?'breaking':''}`}>
 <div className="news-src">{n.isBreaking&&<span className="dot red" style={{width:6,height:6}}></span>}{n.source}{tg&&<span className={`tag ${tg}`}>{tg}</span>}</div>
 <div className="news-title">{n.title}</div>
