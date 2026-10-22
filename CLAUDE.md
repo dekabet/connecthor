@@ -39,7 +39,20 @@ A single-page "situation monitor" inspired by PizzINT (pizzint.watch). A 3D glob
 ## How to test (no network to these APIs from the cloud sandbox)
 The sandbox blocks unpkg and every data API. Install the libraries from npm into a scratch folder and serve them through Playwright `page.route`; mock each API with fixtures, and use `page.routeWebSocket` for the CLOB stream. Run Chromium from `/opt/pw-browsers/chromium`. Scenarios to cover: full mocks, offline (abort everything), and `--disable-webgl`. Also compile-check with `@babel/standalone` (classic React preset) before pushing.
 
-**Nothing has been verified against the real Kalshi / Manifold / PredictIt / adsb.lol / GDELT servers from the sandbox.** Polymarket is confirmed live by the owner.
+### Live API check (2026-10-22, real Chromium on the live site + direct requests)
+| Feed | Result from a browser on mbp-agentz.github.io |
+|---|---|
+| Polymarket Gamma, CLOB history, CLOB WebSocket, Data API trades | ✅ CORS `*`. Gamma is ~400 KB × 6 requests with an 8 s timeout: some timed out on a slow line |
+| Manifold | ✅ CORS `*` |
+| GDELT | ⚠️ CORS `*`, but often 10–20 s (timeout is 12 s) and 429 "one request every 5 seconds" per IP |
+| **rss2json (all news)** | ❌ Cloudflare challenge (`cf-mitigated: challenge`, 403, no CORS): **0 headlines**. Raw RSS feeds have no CORS either |
+| **Kalshi** | ❌ blocked by CORS in the browser (data itself is fine server-side) |
+| **PredictIt** | ❌ 403 + no CORS |
+| **adsb.lol** | ❌ no CORS header; also rejects generic User-Agents |
+| corsproxy.io / allorigins | ❌ corsproxy needs an API key (401); allorigins 520/522. Every failing feed burns 10–30 s retrying through them |
+
+So the `/api` proxy (open item 1) is a launch blocker, not an optimisation.
+Data-shape notes from the same check: Kalshi markets now only carry `*_dollars` / `*_fp` fields (`volume_fp`, `volume_24h_fp`, `liquidity_dollars`), so `num(m.volume)` and `num(m.volume_24h)` read 0. Polymarket events can contain resolved-but-not-closed markets (`outcomePrices` `["1","0"]`). The console shows repeated `THREE.BufferGeometry.computeBoundingSphere(): Computed radius is NaN` (cosmetic; cause not found yet).
 
 ## Status (2026-10-22)
 - dekabet/connecthor#1–#3 are merged; the repo now lives at mbp-agentz/connecthor and Pages is live at the new URL.
@@ -48,13 +61,13 @@ The sandbox blocks unpkg and every data API. Install the libraries from npm into
 - The owner wants to launch and share on X/Twitter for feedback.
 
 ## Open items (priority order)
-1. **Pre-launch (owner):** rotate the old NewsAPI key; optionally make a 1200×630 share image (currently the 512px icon, shown as a small `summary` card).
-2. **Owner check in a real browser:** which venues appear in the globe badge, whether Price stream shows LIVE, whether Flow shows real trades, the aircraft count, and the GDELT chart.
-3. **Move to Cloudflare Pages + Functions** (planned):
+1. **Launch blocker: move to Cloudflare Pages + Functions** (news, Kalshi, PredictIt and aircraft are dead in the browser without it; see Live API check):
    - An `/api/*` allow-listed proxy with edge caching per feed.
    - Secrets (NewsAPI) stored server-side.
    - The page tries `/api` first, then falls back to the current direct path.
    - `wrangler.toml`; the owner connects the repo in the Cloudflare dashboard (framework None, output `/`).
+2. **Data fixes:** Kalshi `_fp`/`_dollars` volume fields; skip Polymarket markets that are resolved (price ≥ 0.99) or past `endDate`; only geopolitical whale trades in the ticker; badge must not say "Live" when only Manifold loaded; NaN geometry warning.
+3. **Owner (pre-launch):** rotate the old NewsAPI key; 1200×630 share image (currently the 512px icon as a small `summary` card).
 4. Real pizza data (a scheduled job feeding `PIZZA_DATA_URL`) if a lawful data source is found.
 
 ## Working conventions
