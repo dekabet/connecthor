@@ -6,7 +6,8 @@ For the background (what the owner asked for, the timeline, and why things were 
 ## What it is
 A single-page "situation monitor" inspired by PizzINT (pizzint.watch). A 3D globe shows geopolitical prediction markets, with a Pentagon Pizza Index / DOUGHCON panel, a "Nothing Ever Happens" (NEH) index, live trades, military aircraft and a news feed.
 
-- Live site: https://dekabet.github.io/connecthor/ (GitHub Pages, deploys from `main`)
+- Repo: https://github.com/mbp-agentz/connecthor (moved from `dekabet/connecthor` in Oct 2026; PRs #1–#3 were made there)
+- Live site: https://mbp-agentz.github.io/connecthor/ (GitHub Pages, deploys from `main`). The old `dekabet.github.io/connecthor` URL is no longer the one to share.
 - Everything is in **one static file**, `index.html`: React 18 UMD, react-globe.gl 2.27.2 and in-browser Babel 7.25.6, all pinned from unpkg. There is no build step, no package.json and no backend (yet).
 - Icons: `favicon.svg` is the source. `favicon.ico`, `favicon-32.png`, `apple-touch-icon.png` and `icon-512.png` are rendered from it, because Safari ignores SVG favicons.
 
@@ -14,8 +15,8 @@ A single-page "situation monitor" inspired by PizzINT (pizzint.watch). A 3D glob
 | Section | Marker | Notes |
 |---|---|---|
 | Boot screen + failure message | `window.__booted` | Shows why the page failed instead of leaving it blank |
-| News (RSS via rss2json, NewsAPI on localhost only) | `NEWS API CONFIG` | `NEWS_API_KEY` is public: **remove and rotate it** |
-| Pizza index (modeled) | `PIZZA INDEX` | `SHOPS`, `DOUGHCON`, `modelSnapshot`, and `PIZZA_DATA_URL` for a real feed |
+| News (RSS via rss2json) | `// ============ NEWS` | NewsAPI was removed (its key can't be public); it returns server-side with the `/api` proxy |
+| Pizza index (modeled) | `PIZZA INDEX` | `SHOPS` (generic names, ids `shop-1`…`shop-6`), `DOUGHCON`, `modelSnapshot`, and `PIZZA_DATA_URL` for a real feed |
 | Sample markets (offline fallback) | `const MARKETS=[` | |
 | Polymarket: Gamma, Data API trades, CLOB history, WebSocket | `POLYMARKET` | `getJSON` = direct, then CORS proxies; `useLivePrices` = WebSocket |
 | Kalshi / Manifold / PredictIt | `OTHER PREDICTION MARKETS` | `SOURCES`, `similarMarkets` (cross-venue matching) |
@@ -23,6 +24,7 @@ A single-page "situation monitor" inspired by PizzINT (pizzint.watch). A 3D glob
 | NEH index | `NOTHING EVER HAPPENS INDEX` | Real-money venues only (`isUSD`) |
 | Hotspots, Ticker, FlatMap (2D fallback), Boundary | `COMPONENTS` | |
 | App state, effects, render | `function App()` | |
+| Footer (PizzINT credit, data sources, disclaimer) | `className="foot"` | Its own grid row `f` below the ticker |
 
 ## Rules that matter (learned the hard way)
 - **WebGL may be missing** (Brave without graphics acceleration). `HAS_WEBGL` switches to the 2D `FlatMap`. Never render `<Globe>` unguarded: an uncaught WebGL error blanks the whole page.
@@ -39,15 +41,14 @@ The sandbox blocks unpkg and every data API. Install the libraries from npm into
 
 **Nothing has been verified against the real Kalshi / Manifold / PredictIt / adsb.lol / GDELT servers from the sandbox.** Polymarket is confirmed live by the owner.
 
-## Status (2026-10-17)
-- PR dekabet/connecthor#1 and dekabet/connecthor#2 are merged and live.
+## Status (2026-10-22)
+- dekabet/connecthor#1–#3 are merged; the repo now lives at mbp-agentz/connecthor and Pages is live at the new URL.
+- Pre-launch fixes done (pending PR merge): generic shop names, NewsAPI key and code removed, footer with PizzINT credit + "for fun, not financial advice", absolute `og:image`/`og:url` + `twitter:card` for X previews.
+- **The old NewsAPI key is still in git history**: the owner must revoke/rotate it at newsapi.org.
 - The owner wants to launch and share on X/Twitter for feedback.
 
 ## Open items (priority order)
-1. **Pre-launch:**
-   - Replace real pizza shop names with generic ones (the data is simulated).
-   - Delete `NEWS_API_KEY` from the page (the owner should rotate it).
-   - Add on-page PizzINT credit and a "for fun, not financial advice" footer.
+1. **Pre-launch (owner):** rotate the old NewsAPI key; optionally make a 1200×630 share image (currently the 512px icon, shown as a small `summary` card).
 2. **Owner check in a real browser:** which venues appear in the globe badge, whether Price stream shows LIVE, whether Flow shows real trades, the aircraft count, and the GDELT chart.
 3. **Move to Cloudflare Pages + Functions** (planned):
    - An `/api/*` allow-listed proxy with edge caching per feed.
