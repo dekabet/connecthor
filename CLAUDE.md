@@ -1,6 +1,7 @@
 # ConnecTHOR — project guide for Claude
 
 Read this first. It replaces the chat history that built the project, so keep it current. When you finish a piece of work, update **Status** and **Open items** below.
+For the background (what the owner asked for, the timeline, and why things were decided), read `HISTORY.md`.
 
 ## What it is
 A single-page "situation monitor" inspired by PizzINT (pizzint.watch). A 3D globe shows geopolitical prediction markets, with a Pentagon Pizza Index / DOUGHCON panel, a "Nothing Ever Happens" (NEH) index, live trades, military aircraft and a news feed.
