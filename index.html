@@ -12,10 +12,13 @@
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
-  <meta property="og:image" content="https://mbp-agentz.github.io/connecthor/icon-512.png">
+  <meta property="og:image" content="https://mbp-agentz.github.io/connecthor/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta property="og:url" content="https://mbp-agentz.github.io/connecthor/">
   <meta property="og:type" content="website">
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://mbp-agentz.github.io/connecthor/og-image.png">
   <script src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/react-globe.gl@2.27.2"></script>
@@ -228,65 +231,48 @@ const{useState,useEffect,useRef,useMemo}=React;
 const Globe=window.Globe;
 
 // ============ NEWS ============
-// RSS via rss2json. NewsAPI's free plan blocks browser requests outside localhost, and
-// its key can't live in a public page; it comes back server-side with the /api proxy.
-const RSS_FEEDS=[
-{url:'https://feeds.bbci.co.uk/news/world/rss.xml',name:'BBC'},
-{url:'https://rss.nytimes.com/services/xml/rss/nyt/World.xml',name:'NYT'},
-{url:'https://www.aljazeera.com/xml/rss/all.xml',name:'Al Jazeera'},
-{url:'https://feeds.npr.org/1001/rss.xml',name:'NPR'},
-{url:'https://www.theguardian.com/world/rss',name:'Guardian'},
-];
-
-// rss2json returns pubDate as "YYYY-MM-DD HH:MM:SS" in UTC. new Date() reads that as
-// local time (Chrome/Firefox) or Invalid Date (Safari), so normalise to ISO UTC first.
-function parseDate(s) {
-  if (!s) return new Date(NaN);
-  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) s = s.replace(' ', 'T') + 'Z';
-  return new Date(s);
-}
-
+// Headlines come from /api/news (BBC, NYT, Al Jazeera, NPR and Guardian RSS, fetched and merged
+// server-side by functions/api). rss2json now answers browsers with a Cloudflare challenge and
+// the feeds themselves send no CORS headers, so a static host can't read them. Without the
+// proxy (GitHub Pages, file://) the fallback is GDELT's article list, which does allow CORS.
 const isRecent = (d, ms) => { const age = Date.now() - d.getTime(); return age >= 0 && age < ms; };
+// GDELT stamps look like 20261022T183000Z
+const gdeltDate = s => { const m = String(s).match(/^(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?/); return m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +(m[4] || 0), +(m[5] || 0))) : new Date(NaN); };
 
-async function fetchFeed(feed) {
-  const r = await fetch('https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feed.url), {
-    signal: AbortSignal.timeout(6000)
-  });
-  if (!r.ok) throw new Error(feed.name + ' HTTP ' + r.status);
-  const d = await r.json();
-  if (d.status !== 'ok' || !d.items) throw new Error(feed.name + ': ' + (d.message || 'bad response'));
-  return d.items.slice(0, 5).map(item => {
-    const time = parseDate(item.pubDate);
-    return {
-      id: 'rss-' + (item.guid || item.link),
-      title: item.title?.replace(/<[^>]+>/g, '').trim() || '',
-      source: feed.name,
-      url: item.link,
-      time,
-      isBreaking: isRecent(time, 3600000), // 1 hour
-    };
-  });
-}
-
-// Fetch all feeds in parallel so one slow/dead feed doesn't stall the rest
-async function fetchRSSFeeds() {
-  const results = await Promise.allSettled(RSS_FEEDS.map(fetchFeed));
-  const all = [];
-  results.forEach(r => r.status === 'fulfilled' ? all.push(...r.value) : console.log('RSS error:', r.reason?.message));
+function tidyNews(source, items) {
   const seen = new Set();
   return {
-    source: 'rss',
-    items: all
-      .filter(n => n.title && n.title.length > 10 && !seen.has(n.id) && seen.add(n.id))
+    source,
+    items: items
+      .filter(n => n.title && n.title.length > 10 && !seen.has(n.title.toLowerCase()) && seen.add(n.title.toLowerCase()))
       .sort((a, b) => (b.time.getTime() || 0) - (a.time.getTime() || 0))
       .slice(0, 25)
   };
 }
 
+async function fetchProxyNews() {
+  const d = await getJSON('/api/news', 10000);
+  return tidyNews('rss', (d.items || []).map(n => {
+    const time = new Date(n.time);
+    return { id: 'rss-' + (n.guid || n.url), title: n.title, source: n.source, url: n.url, time, isBreaking: isRecent(time, 3600000) };
+  }));
+}
+
+const GDELT_NEWS_Q = '(military OR missile OR airstrike OR troops OR ceasefire OR sanctions OR nuclear OR invasion OR drone) sourcelang:english';
+async function fetchGdeltNews() {
+  const d = await getJSON(`${GDELT}?query=${encodeURIComponent(GDELT_NEWS_Q)}&mode=artlist&maxrecords=50&sort=datedesc&timespan=6h&format=json`, 25000);
+  return tidyNews('gdelt', (d.articles || []).map(a => {
+    const time = gdeltDate(a.seendate);
+    return { id: 'gd-' + a.url, title: (a.title || '').replace(/\s+([,.:;!?])/g, '$1').trim(), source: (a.domain || 'News').replace(/^www\./, ''), url: a.url, time, isBreaking: isRecent(time, 3600000) };
+  }));
+}
+
 async function fetchNews() {
-  const rss = await fetchRSSFeeds();
-  console.log('✓ RSS: Got', rss.items.length, 'articles');
-  return rss;
+  if (apiUp) {
+    try { const r = await fetchProxyNews(); if (r.items.length) return r; }
+    catch (e) { console.log('News proxy unavailable:', e.message); }
+  }
+  return fetchGdeltNews();
 }
 
 // ============ PIZZA INDEX ============
@@ -393,16 +379,33 @@ const MARKETS=[
 
 // ============ POLYMARKET ============
 // Public, keyless endpoints: Gamma (events/markets), Data API (trades), CLOB (price history)
-// and the CLOB market WebSocket (live prices). REST calls try direct first, then CORS proxies,
-// and remember whichever route worked.
+// and the CLOB market WebSocket (live prices).
 const GAMMA='https://gamma-api.polymarket.com',DATA_API='https://data-api.polymarket.com',CLOB='https://clob.polymarket.com';
 const CLOB_WS='wss://ws-subscriptions-clob.polymarket.com/ws/market';
-const PROXIES=['','https://corsproxy.io/?url=','https://api.allorigins.win/raw?url='];
-let workingProxy=0;
+const GDELT='https://api.gdeltproject.org/api/v2/doc/doc';
+// When served by Cloudflare Pages, REST calls go through our own /api proxy (functions/api):
+// it adds CORS, a proper User-Agent and edge caching. On GitHub Pages or file:// there is no
+// proxy, so calls go direct. Public CORS proxies were dropped: corsproxy.io now needs a key and
+// allorigins mostly times out, and every dead hop cost 10-30 s per feed.
+const API_ROUTES=[[GAMMA,'/api/gamma'],[DATA_API,'/api/data'],[CLOB,'/api/clob'],['https://api.elections.kalshi.com/trade-api/v2','/api/kalshi'],
+  ['https://api.manifold.markets/v0','/api/manifold'],['https://www.predictit.org/api/marketdata','/api/predictit'],['https://api.adsb.lol/v2','/api/adsb'],[GDELT,'/api/gdelt']];
+// These send no CORS headers (or block browsers outright), so without the proxy don't even try
+const API_ONLY=/elections\.kalshi\.com|predictit\.org|adsb\.lol/;
+let apiUp=/^https?:$/.test(location.protocol)&&!/github\.io$/.test(location.hostname);
+async function fetchJSON(url,timeout){const r=await fetch(url,{signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 async function getJSON(url,timeout=8000){
-  const order=[workingProxy,...PROXIES.keys()].filter((v,i,a)=>a.indexOf(v)===i);let err;
-  for(const i of order){try{const r=await fetch(PROXIES[i]?PROXIES[i]+encodeURIComponent(url):url,{signal:AbortSignal.timeout(timeout)});if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();workingProxy=i;return d}catch(e){err=e}}
-  throw err;
+  const route=API_ROUTES.find(([o])=>url.startsWith(o)),local=url.startsWith('/api/');
+  if(apiUp&&(route||local)){
+    try{return await fetchJSON(local?url:route[1]+url.slice(route[0].length),timeout)}
+    catch(e){
+      // a static host answers /api with its 404 page: no proxy here, stop asking
+      if(/HTTP 404|JSON/.test(e.message))apiUp=false;
+      if(local||API_ONLY.test(url))throw e;
+    }
+  }
+  if(local)throw new Error('no /api proxy on this host');
+  if(API_ONLY.test(url))throw new Error('needs the /api proxy (no CORS)');
+  return fetchJSON(url,timeout);
 }
 // Gamma returns outcomes/outcomePrices/clobTokenIds as JSON-encoded strings
 const parseArr=v=>{if(Array.isArray(v))return v;try{const x=JSON.parse(v);return Array.isArray(x)?x:[]}catch(e){return typeof v==='string'?v.split(','):[]}};
@@ -432,7 +435,9 @@ const fmtChg=c=>(c>0?'▲':c<0?'▼':'')+Math.abs(c*100).toFixed(1);
 const fmtCents=p=>(p*100).toFixed(p<0.01||p>0.99?1:0)+'¢';
 
 function parseEvent(e){
-  const ms=(e.markets||[]).filter(m=>m.active!==false&&!m.closed);
+  // Resolved markets can stay open for days while settlement runs; their 1/0 prices are stale
+  const now=Date.now(),decided=m=>{const p=num(parseArr(m.outcomePrices)[0]);const end=Date.parse(m.endDate||'');return p>=0.995||p<=0.005||(end<now&&(p>=0.97||p<=0.03))};
+  const ms=(e.markets||[]).filter(m=>m.active!==false&&!m.closed&&!decided(m));
   if(!ms.length)return null;
   // single-market events read best by the event title; multi-outcome events by their busiest market
   const m=ms.length===1?ms[0]:[...ms].sort((a,b)=>num(b.volumeNum??b.volume)-num(a.volumeNum??a.volume))[0];
@@ -447,7 +452,7 @@ function parseEvent(e){
 }
 
 async function fetchPoly(){
-  const res=await Promise.allSettled(POLY_FEEDS.map(q=>getJSON(`${GAMMA}/events?closed=false&active=true&limit=100&order=volume24hr&ascending=false${q?'&'+q:''}`)));
+  const res=await Promise.allSettled(POLY_FEEDS.map(q=>getJSON(`${GAMMA}/events?closed=false&active=true&limit=100&order=volume24hr&ascending=false${q?'&'+q:''}`,15000)));
   const byId=new Map();
   res.forEach(r=>{if(r.status==='fulfilled'&&Array.isArray(r.value))r.value.forEach(e=>{if(!byId.has(e.id)){const m=parseEvent(e);if(m)byId.set(e.id,m)}})});
   return[...byId.values()].sort((a,b)=>b.vol24-a.vol24||b.volume-a.volume);
@@ -513,6 +518,8 @@ const isUSD=m=>SOURCES[m.source]?.cur!=='MANA';
 const fmtMoney=(v,src)=>SOURCES[src]?.cur==='MANA'?'Ṁ'+fmtVol(v).slice(1):fmtVol(v);
 // Kalshi prices come as integer cents, newer responses also as "_dollars" strings
 const kPrice=(m,k)=>m[k+'_dollars']!=null?num(m[k+'_dollars']):num(m[k])/100;
+// Volumes moved to fixed-point strings (volume_fp, volume_24h_fp); older responses had integers
+const kVol=(m,k)=>num(m[k+'_fp']??m[k]);
 
 const KALSHI='https://api.elections.kalshi.com/trade-api/v2';
 const KALSHI_CATS=/politic|election|world|econom|geopolit/i;
@@ -523,7 +530,7 @@ async function fetchKalshi(){
     (d.events||[]).forEach(e=>{
       if(e.category&&!KALSHI_CATS.test(e.category))return;
       const ms=(e.markets||[]).filter(m=>!m.status||m.status==='active'||m.status==='open');if(!ms.length)return;
-      const m=ms.length===1?ms[0]:[...ms].sort((a,b)=>num(b.volume)-num(a.volume))[0];
+      const m=ms.length===1?ms[0]:[...ms].sort((a,b)=>kVol(b,'volume')-kVol(a,'volume'))[0];
       const sub=ms.length>1?(m.yes_sub_title||m.subtitle||''):'';
       const question=(e.title||m.title||'')+(sub&&!(e.title||'').includes(sub)?' — '+sub:'');
       const loc=getLoc(question+' '+(e.sub_title||''));if(!loc)return;
@@ -531,7 +538,7 @@ async function fetchKalshi(){
       const p=displayPrice(bid,ask,last||(bid+ask)/2);if(!(p>0))return;
       // Kalshi contracts pay $1, so contract counts ≈ dollars traded
       out.push({id:'k-'+m.ticker,source:'kalshi',question,eventTitle:e.title,probability:p,bid,ask,change24:prev>0?p-prev:0,
-        volume:num(m.volume),vol24:num(m.volume_24h),liquidity:kPrice(m,'liquidity'),endDate:m.close_time,
+        volume:kVol(m,'volume'),vol24:kVol(m,'volume_24h'),liquidity:kPrice(m,'liquidity'),endDate:m.close_time,
         url:'https://kalshi.com/markets/'+String(e.series_ticker||m.event_ticker||'').toLowerCase(),...loc,category:getCat(question)});
     });
     cursor=d.cursor;if(!cursor)break;
@@ -580,7 +587,8 @@ function similarMarkets(m,all){
 // ============ OSINT LAYERS ============
 // Military aircraft broadcasting ADS-B, from the community aggregator adsb.lol (free, no key)
 async function fetchMilAir(){
-  const d=await getJSON('https://api.adsb.lol/v2/mil',10000);
+  // ~200 KB, and the proxy may try adsb.lol then adsb.fi (10 s each)
+  const d=await getJSON('https://api.adsb.lol/v2/mil',25000);
   const ac=Array.isArray(d.ac)?d.ac:Array.isArray(d.aircraft)?d.aircraft:[];
   return ac.filter(a=>isFinite(a.lat)&&isFinite(a.lon)&&a.alt_baro!=='ground').map(a=>({id:'air-'+a.hex,isAir:true,lat:+a.lat,lng:+a.lon,
     callsign:String(a.flight||a.r||a.hex||'').trim(),type:a.t||a.desc||'',reg:a.r||'',alt:typeof a.alt_baro==='number'?a.alt_baro:null,speed:a.gs!=null?Math.round(a.gs):null,track:a.track,squawk:a.squawk||''}));
@@ -588,7 +596,7 @@ async function fetchMilAir(){
 // Share of world news coverage about military conflict, last 7 days (GDELT DOC 2.0)
 const GDELT_Q='(airstrike OR missile OR "military strike" OR invasion OR "armed conflict" OR shelling)';
 async function fetchCoverage(){
-  const d=await getJSON(`https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(GDELT_Q)}&mode=timelinevol&timespan=7d&timelinesmooth=3&format=json`,12000);
+  const d=await getJSON(`${GDELT}?query=${encodeURIComponent(GDELT_Q)}&mode=timelinevol&timespan=7d&timelinesmooth=3&format=json`,25000);
   const pts=(d.timeline?.[0]?.data||[]).map(x=>{const m=String(x.date).match(/^(\d{4})(\d{2})(\d{2})T?(\d{2})?(\d{2})?/);return m?{t:Date.UTC(+m[1],+m[2]-1,+m[3],+(m[4]||0),+(m[5]||0)),v:num(x.value)}:null}).filter(Boolean);
   return pts.length>2?pts:null;
 }
@@ -627,7 +635,7 @@ const ARC_COLORS={Conflict:['rgba(249,115,22,0.8)','rgba(239,68,68,0.25)'],Trump
 function genArcs(ms,flows){
   const out=[],seen=new Set();
   ms.forEach(m=>(m.links||[]).forEach(l=>{const k=[m.country,l.country].sort().join('|');if(seen.has(k)||out.length>=40)return;seen.add(k);
-    out.push({startLat:m.lat,startLng:m.lng,endLat:l.lat,endLng:l.lng,color:ARC_COLORS[m.category]||['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.5+Math.min(m.vol24/2e6,1),dashLength:0.4,dashGap:0.25,dashAnimateTime:7000+out.length*373%3000,initGap:hash(k),altitude:null})}));
+    out.push({startLat:m.lat,startLng:m.lng,endLat:l.lat,endLng:l.lng,color:ARC_COLORS[m.category]||['rgba(59,130,246,0.7)','rgba(139,92,246,0.15)'],stroke:0.5+Math.min((m.vol24||0)/2e6,1),dashLength:0.4,dashGap:0.25,dashAnimateTime:7000+out.length*373%3000,initGap:hash(k),altitude:null})}));
   genArcsDC(ms.filter(m=>m.country!=='USA'&&!(m.links||[]).some(l=>l.country==='USA'))).forEach(a=>out.push(a));
   return out.concat(flows||[]);
 }
@@ -871,7 +879,7 @@ if(document.hidden&&newsRef.current)return;
 try{
 const result=await fetchNews();
 if(result&&result.items.length>0){setNews(result.items);setNewsSource(result.source);setNewsLastUpd(new Date())}
-}catch(e){console.log('News error:',e)}
+}catch(e){console.log('News error:',e);if(!newsRef.current)setNewsSource('off')}
 setNewsLoading(false);
 };
 loadNews();
@@ -887,7 +895,7 @@ const res=await Promise.allSettled(keys.map(k=>FETCHERS[k]()));
 const st={},all=[];
 res.forEach((r,i)=>{const k=keys[i];if(r.status==='fulfilled'&&r.value.length){st[k]=r.value.length;all.push(...r.value)}else{st[k]=0;console.log(srcName(k)+' unavailable:',r.reason?.message||'no geo markets')}});
 setVenues(st);
-if(all.length>5){
+if(all.some(isUSD)){
 // keep live Polymarket prices from the stream when a refresh lands
 setMarkets(prev=>{const old=new Map(prev.map(m=>[m.id,m]));return all.map(m=>{const o=old.get(m.id);return o&&o.flashAt?{...m,probability:o.probability,flash:o.flash,flashAt:o.flashAt}:m})});
 setActivities(genActs(all));setDataSource('live');setLastUpd(new Date());setSelected(s=>s&&(all.find(m=>m.id===s.id)||s));
@@ -900,9 +908,9 @@ return()=>clearInterval(i);
 
 // Military aircraft every 60s, GDELT coverage every 30 min
 useEffect(()=>{
-const loadAir=async()=>{if(document.hidden&&air)return;try{setAir(await fetchMilAir())}catch(e){setAir(a=>a||[]);console.log('Aircraft feed unavailable:',e.message)}};
+const loadAir=async()=>{if(document.hidden&&air)return;try{setAir(await fetchMilAir())}catch(e){console.log('Aircraft feed unavailable:',e.message)}}; // keep the last fix; never show a fake 0
 const loadCov=async()=>{try{const c=await fetchCoverage();if(c)setCoverage(c)}catch(e){console.log('GDELT unavailable:',e.message)}};
-loadAir();loadCov();const i=setInterval(loadAir,60000),j=setInterval(loadCov,1800000);return()=>{clearInterval(i);clearInterval(j)};
+loadAir();const k=setTimeout(loadCov,apiUp?0:7000);const i=setInterval(loadAir,60000),j=setInterval(loadCov,1800000);return()=>{clearTimeout(k);clearInterval(i);clearInterval(j)};
 },[]);
 
 // Shareable links: #m=<market id>; Esc closes the detail panel
@@ -965,6 +973,7 @@ const neh=useMemo(()=>nehIndex(markets),[markets]);
 const nehPrev=useMemo(()=>nehIndex(markets.map(m=>({...m,probability:Math.min(1,Math.max(0,m.probability-(m.change24||0)))}))).score,[markets]);
 const movers=useMemo(()=>[...markets].filter(m=>m.change24).sort((a,b)=>Math.abs(b.change24)-Math.abs(a.change24)).slice(0,5),[markets]);
 const whales=useMemo(()=>trades.filter(t=>t.usd>=WHALE_USD).slice(0,5),[trades]);
+const geoWhales=useMemo(()=>{const c=new Set(markets.map(m=>m.conditionId).filter(Boolean));return trades.filter(t=>t.usd>=WHALE_USD&&c.has(t.conditionId)).slice(0,2)},[trades,markets]);
 const whaleKey=pulses.filter(p=>p.whale).map(p=>p.id).join('|');
 const flowArcs=useMemo(()=>pulses.filter(p=>p.whale).map(p=>({startLat:PENTAGON.lat,startLng:PENTAGON.lng,endLat:p.lat,endLng:p.lng,color:p.side==='SELL'?['rgba(239,68,68,0.1)','rgba(239,68,68,0.95)']:['rgba(34,197,94,0.1)','rgba(34,197,94,0.95)'],stroke:1.4,dashLength:1,dashGap:0,dashAnimateTime:0,altitude:0.35})),[whaleKey]);
 const nl=nehLabel(neh.score);
@@ -986,10 +995,10 @@ const pickPoint=d=>{if(d.isShop||d.isAir){if(d.isAir)window.open('https://globe.
 const tickerItems=useMemo(()=>{
 const head=[{text:`🍕 DOUGHCON ${dc} — ${DOUGHCON[dc].name}`},{text:`📉 Nothing Ever Happens Index: ${neh.score} (${nl.t})`},
 ...movers.slice(0,3).map(m=>({text:`${m.change24>0?'📈':'📉'} ${m.question} ${fmtProb(m.probability)} (${fmtChg(m.change24)} 24h)`,onClick:()=>setSelected(m)})),
-...whales.slice(0,2).map(t=>({text:`🐋 ${fmtVol(t.usd)} ${t.side} ${t.outcome} — ${t.title}`,href:t.url}))];
+...geoWhales.map(t=>({text:`🐋 ${fmtVol(t.usd)} ${t.side} ${t.outcome} — ${t.title}`,href:t.url}))];
 if(news.length===0){const r=[...head,{text:'Loading live news…'}];r.placeholder=true;return r}
 return[...head,...news.slice(0,15).map(n=>({text:(n.isBreaking?'🔴 ':'')+n.source+': '+n.title,href:n.url}))];
-},[news,dc,neh.score,movers,whales]);
+},[news,dc,neh.score,movers,geoWhales]);
 const cats=['All','Conflict','Trump','Politics','Economy','Trade'];
 const hot=useMemo(()=>hotspots(markets),[markets]);
 const hotByCountry=useMemo(()=>new Map(hot.map(h=>[h.country,h])),[hot]);
@@ -1084,7 +1093,7 @@ atmosphereColor="#3b82f6" atmosphereAltitude={0.12}/>}</Boundary>
 <div className="scroll">
 {tab==='news'&&(<>
 <div style={{padding:'0 2px 8px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-<span className={`news-status ${newsSource==='rss'?'rss':''}`}>{newsSource==='rss'?'📡 RSS Feeds':'⏳ Connecting'}</span>
+<span className={`news-status ${newsSource==='gdelt'||newsSource==='off'?'rss':''}`}>{newsSource==='rss'?'📡 RSS Feeds':newsSource==='gdelt'?'🌐 GDELT':newsSource==='off'?'⚠ News offline · retrying':'⏳ Connecting'}</span>
 {newsLastUpd&&<span style={{fontSize:9,color:'var(--muted)'}}>Updated {fmtTime(newsLastUpd)}</span>}
 </div>
 <CoverageChart data={coverage}/>
